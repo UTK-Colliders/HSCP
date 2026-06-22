@@ -56,7 +56,6 @@ private:
     TTreeReaderValue<bool>* HLT_PFHT500_PFMET100_PFMHT100_IDTight_ = nullptr;
     TTreeReaderValue<bool>* HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60_ = nullptr;
     TTreeReaderValue<bool>* HLT_MET105_IsoTrk50_ = nullptr;
-    TTreeReaderValue<bool>* Flag_allMETFilters_ = nullptr;
     TTreeReaderValue<double>* weightPU_ = nullptr;
 
     TTreeReaderValue<double>* L1MET_ = nullptr;
@@ -66,50 +65,26 @@ private:
     TTreeReaderValue<float>* HLTPFMET_ = nullptr;
     TTreeReaderValue<double>* RecoPFMET_ = nullptr;
     TTreeReaderValue<double>* PseudoMET_viaCaloJets_ = nullptr;
-    TTreeReaderValue<double>* RecoPuppiMET_ = nullptr;
-    TTreeReaderValue<double>* RecoPuppiMET_phi_ = nullptr;
 
-    TTreeReaderArray<double>* muon_pt_ = nullptr;
-    TTreeReaderArray<double>* muon_eta_ = nullptr;
-    TTreeReaderArray<double>* muon_phi_ = nullptr;
-    TTreeReaderArray<bool>* muon_isTight_ = nullptr;
-    TTreeReaderArray<bool>* muon_isPFcand_ = nullptr;
-    TTreeReaderArray<float>* muon_pfMiniRelIsoAll_ = nullptr;
-
+    TTreeReaderArray<double>* RecoPUppiMET_ = nullptr;
+    TTreeReaderArray<double>* RecoPUppiMET_phi_ = nullptr;
     TTreeReaderArray<bool>* HSCP_hasTrack_ = nullptr;
     TTreeReaderArray<double>* Pt_ = nullptr;
-    TTreeReaderArray<double>* Pt_pseudo_ = nullptr;
-    TTreeReaderArray<double>* Eta_ = nullptr;
-    TTreeReaderArray<double>* Px_ = nullptr;
-    TTreeReaderArray<double>* Py_ = nullptr;
-    TTreeReaderArray<int>* NbPixelHit_noL1_ = nullptr;
-    TTreeReaderArray<double>* FracOfValidHit_ = nullptr;
-    TTreeReaderArray<int>* NOM_noL1_ = nullptr;
-    TTreeReaderArray<bool>* isHighPurityTrack_ = nullptr;
-    TTreeReaderArray<double>* normChi2_ = nullptr;
-    TTreeReaderArray<double>* dz_ = nullptr;
-    TTreeReaderArray<double>* dxy_ = nullptr;
-    TTreeReaderArray<float>* miniRelIsoAll_ = nullptr;
-    TTreeReaderArray<double>* EoP_ = nullptr;
-    TTreeReaderArray<float>* IsoSumPt_dr03_ = nullptr;
-    TTreeReaderArray<double>* ptOverptErrptErr_ = nullptr;
-    TTreeReaderArray<double>* ptOverptErr_ = nullptr;
-    TTreeReaderArray<float>* Ih_Strip_ = nullptr;
+    TTreeReaderArray<double>* Jet_px_ = nullptr;
+    TTreeReaderArray<double>* Jet_py_ = nullptr;
+    TTreeReaderArray<double>* Jet_pt_ = nullptr;
+    TTreeReaderArray<bool>* Jet_passJetID_ = nullptr;
+    TTreeReaderArray<double>* muon_pt_ = nullptr;
+    TTreeReaderArray<double>* muon_phi_ = nullptr;
+    TTreeReaderArray<bool>* muon_isPFMuon_ = nullptr;
 
-    std::vector<double> Fpix_;
     std::vector<std::string> selections_;
     std::vector<std::string> selLabels_;
 
-    double PFHT_ = 0.0;
-    double PFMHT_ = 0.0;
-    double PFMHTNoMu_ = 0.0;
-    double PFMHT_x_ = 0.0;
-    double PFMHT_y_ = 0.0;
-    double PFMHTNoMu_x_ = 0.0;
-    double PFMHTNoMu_y_ = 0.0;
-    double PUppiMET_NoMu_ = 0.0;
-    double PUppiMET_x_ = 0.0;
-    double PUppiMET_y_ = 0.0;
+    double PFHT_ = 0., PFMHT_ = 0., PFMHTNoMu_ = 0.;
+    double PFMHT_x_ = 0., PFMHT_y_ = 0.;
+    double PFMHTNoMu_x_ = 0., PFMHTNoMu_y_ = 0.;
+    double PUppiMET_NoMu_ = 0., PUppiMET_x_ = 0., PUppiMET_y_ = 0.;
 };
 
 namespace {
@@ -194,7 +169,6 @@ void MET_efficiency::bindBranches() {
     bindValue(*reader_, HLT_PFHT500_PFMET100_PFMHT100_IDTight_, "HLT_PFHT500_PFMET100_PFMHT100_IDTight");
     bindValue(*reader_, HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60_, "HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60");
     bindValue(*reader_, HLT_MET105_IsoTrk50_, "HLT_MET105_IsoTrk50");
-    bindValue(*reader_, Flag_allMETFilters_, "Flag_allMETFilters");
     bindValue(*reader_, weightPU_, "weightPU");
 
     bindValue(*reader_, L1MET_, "L1MET");
@@ -204,35 +178,18 @@ void MET_efficiency::bindBranches() {
     bindValue(*reader_, HLTPFMET_, "HLTPFMET");
     bindValue(*reader_, RecoPFMET_, "RecoPFMET");
     bindValue(*reader_, PseudoMET_viaCaloJets_, "PseudoMET_viaCaloJets");
-    bindValue(*reader_, RecoPuppiMET_, "RecoPuppiMET");
-    bindValue(*reader_, RecoPuppiMET_phi_, "RecoPuppiMET_phi");
 
-    bindArray(*reader_, muon_pt_, "muon_pt");
-    bindArray(*reader_, muon_eta_, "muon_eta");
-    bindArray(*reader_, muon_phi_, "muon_phi");
-    bindArray(*reader_, muon_isTight_, "muon_isTight");
-    bindArray(*reader_, muon_isPFcand_, "Muon_isPFcand");
-    bindArray(*reader_, muon_pfMiniRelIsoAll_, "muon_pfMiniRelIsoAll");
-
+    bindArray(*reader_, RecoPUppiMET_, "RecoPuppiMET");
+    bindArray(*reader_, RecoPUppiMET_phi_, "RecoPuppiMET_phi");
     bindArray(*reader_, HSCP_hasTrack_, "HSCP_hasTrack");
     bindArray(*reader_, Pt_, "IsoTrack_pt");
-    bindArray(*reader_, Pt_pseudo_, "IsoTrack_PseudoTrack_pt");
-    bindArray(*reader_, Eta_, "IsoTrack_eta");
-    bindArray(*reader_, Px_, "IsoTrack_px");
-    bindArray(*reader_, Py_, "IsoTrack_py");
-    bindArray(*reader_, NbPixelHit_noL1_, "IsoTrack_numberOfValidPixelHits");
-    bindArray(*reader_, FracOfValidHit_, "IsoTrack_fractionOfValidHits");
-    bindArray(*reader_, NOM_noL1_, "IsoTrack_numberOfTrackerLayers");
-    bindArray(*reader_, isHighPurityTrack_, "IsoTrack_isHighPurityTrack");
-    bindArray(*reader_, normChi2_, "IsoTrack_normChi2");
-    bindArray(*reader_, dz_, "IsoTrack_dz");
-    bindArray(*reader_, dxy_, "IsoTrack_dxy");
-    bindArray(*reader_, miniRelIsoAll_, "IsoTrack_pfMiniRelIsoAll");
-    bindArray(*reader_, EoP_, "IsoTrack_pfEnergyOverP");
-    bindArray(*reader_, IsoSumPt_dr03_, "IsoTrack_IsoSumPt_dr03");
-    bindArray(*reader_, ptOverptErrptErr_, "IsoTrack_ptErrOverPt2");
-    bindArray(*reader_, ptOverptErr_, "IsoTrack_ptErrOverPt");
-    bindArray(*reader_, Ih_Strip_, "DeDx_IhStrip");
+    bindArray(*reader_, Jet_px_, "puppijet_px");
+    bindArray(*reader_, Jet_py_, "puppijet_py");
+    bindArray(*reader_, Jet_pt_, "puppijet_pt");
+    bindArray(*reader_, Jet_passJetID_, "puppijet_passJetID");
+    bindArray(*reader_, muon_pt_, "muon_pt");
+    bindArray(*reader_, muon_phi_, "muon_phi");
+    bindArray(*reader_, muon_isPFMuon_, "muon_isPFMuon");
 }
 
 void MET_efficiency::createHistograms() {
@@ -242,51 +199,34 @@ void MET_efficiency::createHistograms() {
 }
 
 void MET_efficiency::calculateMETs() {
-    PFHT_ = 0.0;
-    PFMHT_ = 0.0;
-    PFMHTNoMu_ = 0.0;
-    PFMHT_x_ = 0.0;
-    PFMHT_y_ = 0.0;
-    PFMHTNoMu_x_ = 0.0;
-    PFMHTNoMu_y_ = 0.0;
-    PUppiMET_x_ = 0.0;
-    PUppiMET_y_ = 0.0;
-    PUppiMET_NoMu_ = 0.0;
-    Fpix_.clear();
-
-    const auto& pt = Array(Pt_);
-    const auto& px = Array(Px_);
-    const auto& py = Array(Py_);
-    const auto& muonPt = Array(muon_pt_);
-    const auto& muonPhi = Array(muon_phi_);
-    const auto& muonIsPF = Array(muon_isPFcand_);
-
-    for (unsigned int i = 0; i < pt.GetSize(); ++i) {
-        PFHT_ += std::abs(pt[i]);
-        PFMHT_x_ -= px[i];
-        PFMHT_y_ -= py[i];
+    PFHT_ = 0., PFMHT_ = 0., PFMHTNoMu_ = 0.;
+    PFMHT_x_ = 0., PFMHT_y_ = 0.;
+    PFMHTNoMu_x_ = 0., PFMHTNoMu_y_ = 0.;
+    PUppiMET_NoMu_ = 0., PUppiMET_x_ = 0., PUppiMET_y_ = 0.;
+    for ( unsigned int j = 0; j < Jet_pt_->GetSize(); j++ ) {
+        if (Array(Jet_passJetID_)[j]) {
+            PFHT_ += std::abs(Array(Jet_pt_)[j]);
+            PFMHT_x_ += Array(Jet_px_)[j];
+            PFMHT_y_ += Array(Jet_py_)[j];
+        }
     }
-
     PFMHTNoMu_x_ = PFMHT_x_;
     PFMHTNoMu_y_ = PFMHT_y_;
 
-    PUppiMET_x_ = value(RecoPuppiMET_) * std::cos(value(RecoPuppiMET_phi_));
-    PUppiMET_y_ = value(RecoPuppiMET_) * std::sin(value(RecoPuppiMET_phi_));
+    PUppiMET_x_ = Array(RecoPUppiMET_)[0] * std::cos(Array(RecoPUppiMET_phi_)[0]);
+    PUppiMET_y_ = Array(RecoPUppiMET_)[0] * std::sin(Array(RecoPUppiMET_phi_)[0]);
+    for (unsigned m = 0; m <muon_pt_->GetSize(); m++) {
+        if (Array(muon_isPFMuon_)[m]) {
+            PFMHTNoMu_x_ -= Array(muon_pt_)[m] * std::cos(Array(muon_phi_)[m]);
+            PFMHTNoMu_y_ -= Array(muon_pt_)[m] * std::sin(Array(muon_phi_)[m]);
 
-    for (unsigned int m = 0; m < muonPt.GetSize(); ++m) {
-        if (m < muonIsPF.GetSize() && muonIsPF[m]) {
-            const double muPt = muonPt[m];
-            const double muPhi = muonPhi[m];
-            PFMHTNoMu_x_ -= muPt * std::cos(muPhi);
-            PFMHTNoMu_y_ -= muPt * std::sin(muPhi);
-            PUppiMET_x_ -= muPt * std::cos(muPhi);
-            PUppiMET_y_ -= muPt * std::sin(muPhi);
+            PUppiMET_x_ -= Array(muon_pt_)[m] * std::cos(Array(muon_phi_)[m]);
+            PUppiMET_y_ -= Array(muon_pt_)[m] * std::sin(Array(muon_phi_)[m]);
         }
     }
-
-    PFMHT_ = std::sqrt(PFMHT_x_ * PFMHT_x_ + PFMHT_y_ * PFMHT_y_);
-    PFMHTNoMu_ = std::sqrt(PFMHTNoMu_x_ * PFMHTNoMu_x_ + PFMHTNoMu_y_ * PFMHTNoMu_y_);
-    PUppiMET_NoMu_ = std::sqrt(PUppiMET_x_ * PUppiMET_x_ + PUppiMET_y_ * PUppiMET_y_);
+    PFMHT_ = std::sqrt(PFMHT_x_*PFMHT_x_ + PFMHT_y_*PFMHT_y_);
+    PFMHTNoMu_ = std::sqrt(PFMHTNoMu_x_*PFMHTNoMu_x_ + PFMHTNoMu_y_*PFMHTNoMu_y_);
+    PUppiMET_NoMu_ = std::sqrt(PUppiMET_x_*PUppiMET_x_ + PUppiMET_y_*PUppiMET_y_);
 }
 
 void MET_efficiency::fillHistograms() {
@@ -301,7 +241,7 @@ void MET_efficiency::fillHistograms() {
         const double hltCaloMHT = value(HLTCaloMHT_);
         const double hltPFMHT = value(HLTPFMHT_);
         const double hltPFMET = value(HLTPFMET_);
-        const double recoPuppiMET = value(RecoPuppiMET_);
+        const double recoPuppiMET = Array(RecoPUppiMET_)[0];
         const bool hltPFMET120 = value(HLT_PFMET120_PFMHT120_IDTight_);
         const bool hltPFHT500 = value(HLT_PFHT500_PFMET100_PFMHT100_IDTight_);
         const bool hltNoMu120 = value(HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60_);
