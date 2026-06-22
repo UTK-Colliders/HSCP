@@ -2,6 +2,7 @@
 #include <array>
 #include <cctype>
 #include <cmath>
+#include <memory>
 #include <fstream>
 #include <iostream>
 #include <map>
@@ -16,6 +17,7 @@
 #include "TH1F.h"
 #include "TH2F.h"
 #include "TString.h"
+#include "TSystem.h"
 #include "TTree.h"
 #include "TTreeReader.h"
 #include "TTreeReaderArray.h"
@@ -23,339 +25,369 @@
 
 class MET_efficiency {
 public:
-    explicit MET_efficiency(std::string inputFile, std::string outputDir);
-    ~MET_efficiency() override = default;
+    explicit MET_efficiency(std::string inputFile, std::string outputDir,
+                            bool HLT_PFMET120_PFMHT120_IDTight = true,
+                            bool HLT_PFHT500_PFMET100_PFMHT100_IDTight = true,
+                            bool HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60 = true,
+                            bool HLT_MET105_IsoTrk50 = true);
+    ~MET_efficiency() = default;
+
+    struct HistStore {
+        std::unordered_map<std::string, TH1F*> h1;
+        std::unordered_map<std::string, TH2F*> h2;
+    };
+    std::vector<HistStore> hists;
+
 private:
+    void bindBranches();
     void createHistograms();
     void calculateMETs();
     void fillHistograms();
+    void writeHistograms();
 
-    bool HLT_PFMET120_PFMHT120_IDTight_;
-    bool HLT_PFHT500_PFMET100_PFMHT100_IDTight_;
-    bool HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60_;
-    bool HLT_MET105_IsoTrk50_;
-    double PFHT = 0., PFMHT = 0., PFMHTNoMu = 0.;
-    double PFMHT_x = 0., PFMHT_y = 0.;
-    double PFMHTNoMu_x = 0., PFMHTNoMu_y = 0.;
-    double PUppiMET_NoMu = 0., PUppiMET_x = 0., PUppiMET_y = 0.;
+    std::string inputFile_;
+    std::string outputDir_;
+    std::unique_ptr<TFile> inputFileHandle_;
+    std::unique_ptr<TFile> outputFileHandle_;
+    std::unique_ptr<TTreeReader> reader_;
+    TTree* tree_ = nullptr;
+
+    TTreeReaderValue<bool>* HLT_PFMET120_PFMHT120_IDTight_ = nullptr;
+    TTreeReaderValue<bool>* HLT_PFHT500_PFMET100_PFMHT100_IDTight_ = nullptr;
+    TTreeReaderValue<bool>* HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60_ = nullptr;
+    TTreeReaderValue<bool>* HLT_MET105_IsoTrk50_ = nullptr;
+    TTreeReaderValue<bool>* Flag_allMETFilters_ = nullptr;
+    TTreeReaderValue<double>* weightPU_ = nullptr;
+
+    TTreeReaderValue<double>* L1MET_ = nullptr;
+    TTreeReaderValue<float>* HLTCaloMET_ = nullptr;
+    TTreeReaderValue<float>* HLTCaloMHT_ = nullptr;
+    TTreeReaderValue<float>* HLTPFMHT_ = nullptr;
+    TTreeReaderValue<float>* HLTPFMET_ = nullptr;
+    TTreeReaderValue<double>* RecoPFMET_ = nullptr;
+    TTreeReaderValue<double>* PseudoMET_viaCaloJets_ = nullptr;
+    TTreeReaderValue<double>* RecoPuppiMET_ = nullptr;
+    TTreeReaderValue<double>* RecoPuppiMET_phi_ = nullptr;
+
+    TTreeReaderArray<double>* muon_pt_ = nullptr;
+    TTreeReaderArray<double>* muon_eta_ = nullptr;
+    TTreeReaderArray<double>* muon_phi_ = nullptr;
+    TTreeReaderArray<bool>* muon_isTight_ = nullptr;
+    TTreeReaderArray<bool>* muon_isPFcand_ = nullptr;
+    TTreeReaderArray<float>* muon_pfMiniRelIsoAll_ = nullptr;
+
+    TTreeReaderArray<bool>* HSCP_hasTrack_ = nullptr;
+    TTreeReaderArray<double>* Pt_ = nullptr;
+    TTreeReaderArray<double>* Pt_pseudo_ = nullptr;
+    TTreeReaderArray<double>* Eta_ = nullptr;
+    TTreeReaderArray<double>* Px_ = nullptr;
+    TTreeReaderArray<double>* Py_ = nullptr;
+    TTreeReaderArray<int>* NbPixelHit_noL1_ = nullptr;
+    TTreeReaderArray<double>* FracOfValidHit_ = nullptr;
+    TTreeReaderArray<int>* NOM_noL1_ = nullptr;
+    TTreeReaderArray<bool>* isHighPurityTrack_ = nullptr;
+    TTreeReaderArray<double>* normChi2_ = nullptr;
+    TTreeReaderArray<double>* dz_ = nullptr;
+    TTreeReaderArray<double>* dxy_ = nullptr;
+    TTreeReaderArray<float>* miniRelIsoAll_ = nullptr;
+    TTreeReaderArray<double>* EoP_ = nullptr;
+    TTreeReaderArray<float>* IsoSumPt_dr03_ = nullptr;
+    TTreeReaderArray<double>* ptOverptErrptErr_ = nullptr;
+    TTreeReaderArray<double>* ptOverptErr_ = nullptr;
+    TTreeReaderArray<float>* Ih_Strip_ = nullptr;
+
+    std::vector<double> Fpix_;
+    std::vector<std::string> selections_;
+    std::vector<std::string> selLabels_;
+
+    double PFHT_ = 0.0;
+    double PFMHT_ = 0.0;
+    double PFMHTNoMu_ = 0.0;
+    double PFMHT_x_ = 0.0;
+    double PFMHT_y_ = 0.0;
+    double PFMHTNoMu_x_ = 0.0;
+    double PFMHTNoMu_y_ = 0.0;
+    double PUppiMET_NoMu_ = 0.0;
+    double PUppiMET_x_ = 0.0;
+    double PUppiMET_y_ = 0.0;
 };
 
-void MET_efficiency::MET_efficiency(std::string inputFile, std::string outputDir, bool HLT_PFMET120_PFMHT120_IDTight, bool HLT_PFHT500_PFMET100_PFMHT100_IDTight, bool HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60, bool HLT_MET105_IsoTrk50) {
-    TFile inputFile_(inputFile.c_str(), "READ");
-    if (inputFile_.IsZombie()) {
-        std::cerr << "cannot open input file " << inputFile << std::endl;
+namespace {
+
+template <typename T>
+void bindValue(TTreeReader& reader, TTreeReaderValue<T>*& handle, const char* branchName) {
+    handle = new TTreeReaderValue<T>(reader, branchName);
+}
+
+template <typename T>
+void bindArray(TTreeReader& reader, TTreeReaderArray<T>*& handle, const char* branchName) {
+    handle = new TTreeReaderArray<T>(reader, branchName);
+}
+
+template <typename T>
+const T& value(TTreeReaderValue<T>* handle) {
+    return **handle;
+}
+
+template <typename T>
+const TTreeReaderArray<T>& Array(const TTreeReaderArray<T>* handle) {
+    return *handle;
+}
+
+double axisMax1D(const std::string& name) {
+    if (name.find("eta") != std::string::npos) return 3.0;
+    if (name.find("phi") != std::string::npos) return 3.2;
+    if (name.find("dxy") != std::string::npos) return 0.1;
+    if (name.find("dz") != std::string::npos) return 0.5;
+    if (name.find("IsoSumPt") != std::string::npos) return 50.0;
+    if (name.find("PT") != std::string::npos || name.find("pt") != std::string::npos) return 500.0;
+    return 1000.0;
+}
+
+} // namespace
+
+MET_efficiency::MET_efficiency(std::string inputFile, std::string outputDir,
+                               bool HLT_PFMET120_PFMHT120_IDTight,
+                               bool HLT_PFHT500_PFMET100_PFMHT100_IDTight,
+                               bool HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60,
+                               bool HLT_MET105_IsoTrk50)
+    : inputFile_(std::move(inputFile)), outputDir_(std::move(outputDir)) {
+    (void)HLT_PFMET120_PFMHT120_IDTight;
+    (void)HLT_PFHT500_PFMET100_PFMHT100_IDTight;
+    (void)HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60;
+    (void)HLT_MET105_IsoTrk50;
+
+    inputFileHandle_.reset(TFile::Open(inputFile_.c_str(), "READ"));
+    if (!inputFileHandle_ || inputFileHandle_->IsZombie()) {
+        std::cerr << "cannot open input file " << inputFile_ << std::endl;
         return;
     }
 
-    TTree* tree = nullptr;
-    TDirectory* stageDir = inputFile_.GetDirectory("stage");
-    if (stageDir) {
-        stageDir->GetObject("ttree", tree);
+    tree_ = dynamic_cast<TTree*>(inputFileHandle_->Get("HSCPMiniAODAnalyzer/Events"));
+    if (!tree_) {
+        inputFileHandle_->GetObject("Events", tree_);
     }
-    if (!tree) {
-        inputFile_.GetObject("ttree", tree);
-    }
-    if (!tree) {
-        std::cerr << "cannot find ttree in " << inputFile << std::endl;
+    if (!tree_) {
+        std::cerr << "cannot find Events tree in " << inputFile_ << std::endl;
         return;
     }
 
-    TTreeReader reader(tree);
-    TTreeReaderValue<int> runNumber(reader, "runNumber");
+    reader_ = std::make_unique<TTreeReader>(tree_);
+    bindBranches();
+    createHistograms();
 
+    if (!outputDir_.empty()) {
+        gSystem->mkdir(outputDir_.c_str(), true);
+        outputFileHandle_.reset(TFile::Open((outputDir_ + "/MET_efficiency.root").c_str(), "RECREATE"));
+    }
+
+    while (reader_->Next()) {
+        calculateMETs();
+        fillHistograms();
+    }
+
+    writeHistograms();
 }
 
-void MET_efficiency::createHistograms(){
+void MET_efficiency::bindBranches() {
+    bindValue(*reader_, HLT_PFMET120_PFMHT120_IDTight_, "HLT_PFMET120_PFMHT120_IDTight");
+    bindValue(*reader_, HLT_PFHT500_PFMET100_PFMHT100_IDTight_, "HLT_PFHT500_PFMET100_PFMHT100_IDTight");
+    bindValue(*reader_, HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60_, "HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60");
+    bindValue(*reader_, HLT_MET105_IsoTrk50_, "HLT_MET105_IsoTrk50");
+    bindValue(*reader_, Flag_allMETFilters_, "Flag_allMETFilters");
+    bindValue(*reader_, weightPU_, "weightPU");
+
+    bindValue(*reader_, L1MET_, "L1MET");
+    bindValue(*reader_, HLTCaloMET_, "HLTCaloMET");
+    bindValue(*reader_, HLTCaloMHT_, "HLTCaloMHT");
+    bindValue(*reader_, HLTPFMHT_, "HLTPFMHT");
+    bindValue(*reader_, HLTPFMET_, "HLTPFMET");
+    bindValue(*reader_, RecoPFMET_, "RecoPFMET");
+    bindValue(*reader_, PseudoMET_viaCaloJets_, "PseudoMET_viaCaloJets");
+    bindValue(*reader_, RecoPuppiMET_, "RecoPuppiMET");
+    bindValue(*reader_, RecoPuppiMET_phi_, "RecoPuppiMET_phi");
+
+    bindArray(*reader_, muon_pt_, "muon_pt");
+    bindArray(*reader_, muon_eta_, "muon_eta");
+    bindArray(*reader_, muon_phi_, "muon_phi");
+    bindArray(*reader_, muon_isTight_, "muon_isTight");
+    bindArray(*reader_, muon_isPFcand_, "Muon_isPFcand");
+    bindArray(*reader_, muon_pfMiniRelIsoAll_, "muon_pfMiniRelIsoAll");
+
+    bindArray(*reader_, HSCP_hasTrack_, "HSCP_hasTrack");
+    bindArray(*reader_, Pt_, "IsoTrack_pt");
+    bindArray(*reader_, Pt_pseudo_, "IsoTrack_PseudoTrack_pt");
+    bindArray(*reader_, Eta_, "IsoTrack_eta");
+    bindArray(*reader_, Px_, "IsoTrack_px");
+    bindArray(*reader_, Py_, "IsoTrack_py");
+    bindArray(*reader_, NbPixelHit_noL1_, "IsoTrack_numberOfValidPixelHits");
+    bindArray(*reader_, FracOfValidHit_, "IsoTrack_fractionOfValidHits");
+    bindArray(*reader_, NOM_noL1_, "IsoTrack_numberOfTrackerLayers");
+    bindArray(*reader_, isHighPurityTrack_, "IsoTrack_isHighPurityTrack");
+    bindArray(*reader_, normChi2_, "IsoTrack_normChi2");
+    bindArray(*reader_, dz_, "IsoTrack_dz");
+    bindArray(*reader_, dxy_, "IsoTrack_dxy");
+    bindArray(*reader_, miniRelIsoAll_, "IsoTrack_pfMiniRelIsoAll");
+    bindArray(*reader_, EoP_, "IsoTrack_pfEnergyOverP");
+    bindArray(*reader_, IsoSumPt_dr03_, "IsoTrack_IsoSumPt_dr03");
+    bindArray(*reader_, ptOverptErrptErr_, "IsoTrack_ptErrOverPt2");
+    bindArray(*reader_, ptOverptErr_, "IsoTrack_ptErrOverPt");
+    bindArray(*reader_, Ih_Strip_, "DeDx_IhStrip");
 }
 
-void MET_efficiency::calculateMETs(){
-    for ( unsigned int j = 0; j < Jet_pt.GetSize(); j++ ) {
-        if (Jet_passJetID[j]) {
-            PFHT += std::abs(Jet_pt[j]);
-            
-            PFMHT_x += Jet_px[j];
-            PFMHT_y += Jet_py[j];
-        }
-    }
-    PFMHTNoMu_x = PFMHT_x;
-    PFMHTNoMu_y = PFMHT_y;
-
-    PUppiMET_x = RecoPUppiMET[0] * cos(RecoPUppiMET_phi[0]);
-    PUppiMET_y = RecoPUppiMET[0] * sin(RecoPUppiMET_phi[0]);
-    for (unsigned m = 0; m <muon_pt.GetSize(); m++) {
-        if (muon_isPFMuon[m]) {
-            PFMHTNoMu_x -= muon_pt[m] * cos(muon_phi[m]);
-            PFMHTNoMu_y -= muon_pt[m] * sin(muon_phi[m]);
-
-            PUppiMET_x -= muon_pt[m] * cos(muon_phi[m]);
-            PUppiMET_y -= muon_pt[m] * sin(muon_phi[m]);
-        }
-    }
-    PFMHT = sqrt(PFMHT_x*PFMHT_x + PFMHT_y*PFMHT_y);
-    PFMHTNoMu = sqrt(PFMHTNoMu_x*PFMHTNoMu_x + PFMHTNoMu_y*PFMHTNoMu_y);
-    PUppiMET_NoMu = sqrt(PUppiMET_x*PUppiMET_x + PUppiMET_y*PUppiMET_y);
+void MET_efficiency::createHistograms() {
+    selections_ = {"TriggerEffCalib", "TriggerEffCalib_PseudoMETrescaled", "TriggerEffCalib__Signal", "TriggerEffCalib_PseudoMETrescaled__Signal"};
+    selLabels_ = selections_;
+    hists.resize(selLabels_.size());
 }
-    
-void MET_efficiency::fillHistograms(){
-    for(unsigned int s=0;s<selections_.size();s++) {
-        // Trigger Eff vs PUppiMET and vs PseudoMET
-        if (selLabels_[s] == "TriggerEffCalib" || selLabels_[s] == "TriggerEffCalib_PseudoMETrescaled") {
-            bool BasicSel = false;
-            unsigned int hasPassedMuon = 0;
-            unsigned int hadPassedHSCP = 0;
 
-            if (*HLT_IsoMu27 && muon_pt.GetSize()==1 && Flag_allMETFilters[0]) BasicSel = true;
+void MET_efficiency::calculateMETs() {
+    PFHT_ = 0.0;
+    PFMHT_ = 0.0;
+    PFMHTNoMu_ = 0.0;
+    PFMHT_x_ = 0.0;
+    PFMHT_y_ = 0.0;
+    PFMHTNoMu_x_ = 0.0;
+    PFMHTNoMu_y_ = 0.0;
+    PUppiMET_x_ = 0.0;
+    PUppiMET_y_ = 0.0;
+    PUppiMET_NoMu_ = 0.0;
+    Fpix_.clear();
 
-            for (unsigned int im = 0; im < muon_pt.GetSize(); im++) {
-                if (muon_isTight[im] && muon_pt[im]>30 && muon_pfMiniRelIsoAll[im]<0.15) hasPassedMuon++;
-            }
+    const auto& pt = Array(Pt_);
+    const auto& px = Array(Px_);
+    const auto& py = Array(Py_);
+    const auto& muonPt = Array(muon_pt_);
+    const auto& muonPhi = Array(muon_phi_);
+    const auto& muonIsPF = Array(muon_isPFcand_);
 
-            unsigned int i_track = 0;
-            std::vector <unsigned int> i_candPartialHSCP;
-            for(unsigned int j=0; j<HSCP_hasTrack.GetSize(); j++){    
+    for (unsigned int i = 0; i < pt.GetSize(); ++i) {
+        PFHT_ += std::abs(pt[i]);
+        PFMHT_x_ -= px[i];
+        PFMHT_y_ -= py[i];
+    }
 
-                if (!HSCP_hasTrack[j]) continue;
+    PFMHTNoMu_x_ = PFMHT_x_;
+    PFMHTNoMu_y_ = PFMHT_y_;
 
-                if ( (Pt[i_track] > 50.0) && (Pt_pseudo[i_track] > 50.0) && (std::abs(Eta[i_track]) < 2.4) && (NbPixelHit_noL1[i_track] >= 2) && (FracOfValidHit[i_track] > 0.8) && 
-                (NOM_noL1[i_track] >= 10) && (isHighPurityTrack[i_track] == true) && (normChi2[i_track] < 5.0) && (std::abs(dz[i_track]) < 0.1) && (std::abs(dxy[i_track]) < 0.02) && 
-                (miniRelIsoAll[i_track] < 0.02) && (EoP[i_track] < 0.3) && (IsoSumPt_dr03[i_track] < 15) && (ptOverptErrptErr[i_track] < 0.0008) && 
-                (Fpix[i_track] < 0.9)) { hadPassedHSCP++; i_candPartialHSCP.push_back(i_track); };
+    PUppiMET_x_ = value(RecoPuppiMET_) * std::cos(value(RecoPuppiMET_phi_));
+    PUppiMET_y_ = value(RecoPuppiMET_) * std::sin(value(RecoPuppiMET_phi_));
 
-                i_track++;
-            }
-            
-            if (BasicSel && hasPassedMuon==1 && hadPassedHSCP>0) {
-
-                for (unsigned int im = 0; im < muon_pt.GetSize(); im++) {
-                    if (muon_isTight[im] && muon_pt[im]>30 && muon_pfMiniRelIsoAll[im]<0.15) {
-                        vcp[s].FillHisto1F(selLabels_[s] + "_muon_pt", muon_pt[im], *weightPU);
-                        vcp[s].FillHisto1F(selLabels_[s] + "_muon_eta", muon_eta[im], *weightPU);
-                        vcp[s].FillHisto1F(selLabels_[s] + "_muon_phi", muon_phi[im], *weightPU);
-                    }
-                }
-
-                // After a fit performed on Nm1 CaloMET data and MC (max_data/max_MC)
-                float isRescaled = -1, weightOnCalib = *weightPU;
-                if (selLabels_[s] == "TriggerEffCalib_PseudoMETrescaled") isRescaled = 163.451/146.864; // = 1.113
-                else isRescaled = 1;
-
-                for (int iHSCP=0; iHSCP<(int)i_candPartialHSCP.size(); iHSCP++) vcp[s].FillHisto1F(selLabels_[s] + "_PFtrackPT", Pt[i_candPartialHSCP[iHSCP]], weightOnCalib);
-                vcp[s].FillHisto2F(selLabels_[s] + "_PUppiMET_VS_PseudoMET", RecoPUppiMET[0], PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                vcp[s].FillHisto2F(selLabels_[s] + "_PUppiMETNoMu_VS_PseudoMET", PUppiMET_NoMu, PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                vcp[s].FillHisto1F(selLabels_[s] + "_PUppiMET", RecoPUppiMET[0], weightOnCalib);
-                vcp[s].FillHisto1F(selLabels_[s] + "_PUppiMETNoMu", PUppiMET_NoMu, weightOnCalib);
-                vcp[s].FillHisto1F(selLabels_[s] + "_PseudoCaloMET", PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                vcp[s].FillHisto1F(selLabels_[s] + "_RecoPFMET", RecoPFMET[0], weightOnCalib);
-                vcp[s].FillHisto1F(selLabels_[s] + "_L1MET", L1MET[0], weightOnCalib);
-                vcp[s].FillHisto1F(selLabels_[s] + "_HLTCaloMET", HLTCaloMET[0], weightOnCalib);
-                vcp[s].FillHisto1F(selLabels_[s] + "_HLTCaloMHT", HLTCaloMHT[0], weightOnCalib);
-                vcp[s].FillHisto1F(selLabels_[s] + "_HLTPFMHT", HLTPFMHT[0], weightOnCalib);
-                vcp[s].FillHisto1F(selLabels_[s] + "_HLTPFMET", HLTPFMET[0], weightOnCalib);
-
-
-                if (*HLT_PFMET120_PFMHT120_IDTight && PFMHT>120) {
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_PFMET120_PFMHT120_IDTight___PseudoCaloMET", PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_PFMET120_PFMHT120_IDTight___RecoPFMET", RecoPFMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_PFMET120_PFMHT120_IDTight___PUppiMET", RecoPUppiMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_PFMET120_PFMHT120_IDTight___PUppiMETNoMu", PUppiMET_NoMu, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___HLT_PFMET120_PFMHT120_IDTight___PUppiMET_VS_PseudoMET", RecoPUppiMET[0], PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___HLT_PFMET120_PFMHT120_IDTight___PUppiMETNoMu_VS_PseudoMET", PUppiMET_NoMu, PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                }
-                if (*HLT_PFHT500_PFMET100_PFMHT100_IDTight && PFHT>500 && PFMHT>100) {
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_PFHT500_PFMET100_PFMHT100_IDTight___PseudoCaloMET", PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_PFHT500_PFMET100_PFMHT100_IDTight___RecoPFMET", RecoPFMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_PFHT500_PFMET100_PFMHT100_IDTight___PUppiMET", RecoPUppiMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_PFHT500_PFMET100_PFMHT100_IDTight___PUppiMETNoMu", PUppiMET_NoMu, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___HLT_PFHT500_PFMET100_PFMHT100_IDTight___PUppiMET_VS_PseudoMET", RecoPUppiMET[0], PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___HLT_PFHT500_PFMET100_PFMHT100_IDTight___PUppiMETNoMu_VS_PseudoMET", PUppiMET_NoMu, PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                }
-                if (*HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60 && PFMHTNoMu>120 && PFHT>60) {
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60___PseudoCaloMET", PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60___RecoPFMET", RecoPFMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60___PUppiMET", RecoPUppiMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60___PUppiMETNoMu", PUppiMET_NoMu, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60___PUppiMET_VS_PseudoMET", RecoPUppiMET[0], PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60___PUppiMETNoMu_VS_PseudoMET", PUppiMET_NoMu, PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                }
-                if (*HLT_MET105_IsoTrk50) {
-                    for (int iHSCP=0; iHSCP<(int)i_candPartialHSCP.size(); iHSCP++) vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_MET105_IsoTrk50___PFtrackPT", Pt[i_candPartialHSCP[iHSCP]], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_MET105_IsoTrk50___PseudoCaloMET", PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_MET105_IsoTrk50___RecoPFMET", RecoPFMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_MET105_IsoTrk50___PUppiMET", RecoPUppiMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_MET105_IsoTrk50___PUppiMETNoMu", PUppiMET_NoMu, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___HLT_MET105_IsoTrk50___PUppiMET_VS_PseudoMET", RecoPUppiMET[0], PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___HLT_MET105_IsoTrk50___PUppiMETNoMu_VS_PseudoMET", PUppiMET_NoMu, PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                }
-                if ((*HLT_PFMET120_PFMHT120_IDTight && PFMHT>120) || (*HLT_PFHT500_PFMET100_PFMHT100_IDTight && PFHT>500 && PFMHT>100)
-                    || (*HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60 && PFMHTNoMu>120 && PFHT>60) || *HLT_MET105_IsoTrk50) {
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMETtrg___PseudoCaloMET", PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMETtrg___RecoPFMET", RecoPFMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMETtrg___PUppiMET", RecoPUppiMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMETtrg___PUppiMETNoMu", PUppiMET_NoMu, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___orMETtrg___PUppiMET_VS_PseudoMET", RecoPUppiMET[0], PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___orMETtrg___PUppiMETNoMu_VS_PseudoMET", PUppiMET_NoMu, PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                }
-
-                    // 3 among 4 triggers have passed
-                if ((*HLT_PFMET120_PFMHT120_IDTight && PFMHT>120) || (*HLT_PFHT500_PFMET100_PFMHT100_IDTight && PFHT>500 && PFMHT>100)
-                    || (*HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60 && PFMHTNoMu>120 && PFHT>60)) {
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMET3a4trg1___PseudoCaloMET", PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMET3a4trg1___RecoPFMET", RecoPFMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMET3a4trg1___PUppiMET", RecoPUppiMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMET3a4trg1___PUppiMETNoMu", PUppiMET_NoMu, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___orMET3a4trg1___PUppiMET_VS_PseudoMET", RecoPUppiMET[0], PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___orMET3a4trg1___PUppiMETNoMu_VS_PseudoMET", PUppiMET_NoMu, PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                }
-                if ((*HLT_PFMET120_PFMHT120_IDTight && PFMHT>120) || (*HLT_PFHT500_PFMET100_PFMHT100_IDTight && PFHT>500 && PFMHT>100)
-                        || *HLT_MET105_IsoTrk50) {
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMET3a4trg2___PseudoCaloMET", PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMET3a4trg2___RecoPFMET", RecoPFMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMET3a4trg2___PUppiMET", RecoPUppiMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMET3a4trg2___PUppiMETNoMu", PUppiMET_NoMu, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___orMET3a4trg2___PUppiMET_VS_PseudoMET", RecoPUppiMET[0], PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___orMET3a4trg2___PUppiMETNoMu_VS_PseudoMET", PUppiMET_NoMu, PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                }
-                if ((*HLT_PFMET120_PFMHT120_IDTight && PFMHT>120) || (*HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60 && PFMHTNoMu>120 && PFHT>60)
-                        || *HLT_MET105_IsoTrk50) {
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMET3a4trg3___PseudoCaloMET", PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMET3a4trg3___RecoPFMET", RecoPFMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMET3a4trg3___PUppiMET", RecoPUppiMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMET3a4trg3___PUppiMETNoMu", PUppiMET_NoMu, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___orMET3a4trg3___PUppiMET_VS_PseudoMET", RecoPUppiMET[0], PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___orMET3a4trg3___PUppiMETNoMu_VS_PseudoMET", PUppiMET_NoMu, PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                }
-                if ((*HLT_PFHT500_PFMET100_PFMHT100_IDTight && PFHT>500 && PFMHT>100) || (*HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60 && PFMHTNoMu>120 && PFHT>60)
-                        || *HLT_MET105_IsoTrk50) {
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMET3a4trg4___PseudoCaloMET", PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMET3a4trg4___RecoPFMET", RecoPFMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMET3a4trg4___PUppiMET", RecoPUppiMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMET3a4trg4___PUppiMETNoMu", PUppiMET_NoMu, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___orMET3a4trg4___PUppiMET_VS_PseudoMET", RecoPUppiMET[0], PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___orMET3a4trg4___PUppiMETNoMu_VS_PseudoMET", PUppiMET_NoMu, PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                }
-
-            }
-        }
-
-            // Trigger Eff vs PUppiMET and vs PseudoMET for Signal MC
-        if (selLabels_[s] == "TriggerEffCalib__Signal" || selLabels_[s] == "TriggerEffCalib_PseudoMETrescaled__Signal") {
-            unsigned int hadPassedHSCP = 0;
-
-            unsigned int i_track = 0;
-            std::vector <unsigned int> i_candPartialHSCP;
-            for(unsigned int j=0; j<HSCP_hasTrack.GetSize(); j++){    
-
-                if (!HSCP_hasTrack[j]) continue;
-
-                if ( (Flag_allMETFilters[0] == true) && (Pt[i_track] > 50.0) && (Pt_pseudo[i_track] > 50.0) && (std::abs(Eta[i_track]) < 2.4) && (NbPixelHit_noL1[i_track] >= 2) && 
-                (FracOfValidHit[i_track] > 0.8) && (NOM_noL1[i_track] >= 10) && (isHighPurityTrack[i_track] == true) && (normChi2[i_track] < 5.0) && (std::abs(dz[i_track]) < 0.1) &&
-                (std::abs(dxy[i_track]) < 0.02) && (miniRelIsoAll[i_track] < 0.02) && (EoP[i_track] < 0.3) && (IsoSumPt_dr03[i_track] < 15) && (ptOverptErrptErr[i_track] < 0.0008) && 
-                (Fpix[i_track] > 0.3) && (ptOverptErr[i_track] < 1) && (Ih_Strip[i_track] > 2.9784)) { hadPassedHSCP++; i_candPartialHSCP.push_back(i_track); };
-
-                i_track++;
-            }
-            
-            if (hadPassedHSCP>0) {
-
-                // After a fit performed on Nm1 CaloMET data and MC (max_data/max_MC)
-                float isRescaled = -1, weightOnCalib = *weightPU;
-                if (selLabels_[s] == "TriggerEffCalib_PseudoMETrescaled__Signal") isRescaled = 163.451/146.864; // = 1.113
-                else isRescaled = 1;
-
-                for (int iHSCP=0; iHSCP<(int)i_candPartialHSCP.size(); iHSCP++) vcp[s].FillHisto1F(selLabels_[s] + "_PFtrackPT", Pt[i_candPartialHSCP[iHSCP]], weightOnCalib);
-                vcp[s].FillHisto2F(selLabels_[s] + "_PUppiMET_VS_PseudoMET", RecoPUppiMET[0], PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                vcp[s].FillHisto2F(selLabels_[s] + "_PUppiMETNoMu_VS_PseudoMET", PUppiMET_NoMu, PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                vcp[s].FillHisto1F(selLabels_[s] + "_PUppiMET", RecoPUppiMET[0], weightOnCalib);
-                vcp[s].FillHisto1F(selLabels_[s] + "_PUppiMETNoMu", PUppiMET_NoMu, weightOnCalib);
-                vcp[s].FillHisto1F(selLabels_[s] + "_PseudoCaloMET", PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                vcp[s].FillHisto1F(selLabels_[s] + "_RecoPFMET", RecoPFMET[0], weightOnCalib);
-                vcp[s].FillHisto1F(selLabels_[s] + "_L1MET", L1MET[0], weightOnCalib);
-                vcp[s].FillHisto1F(selLabels_[s] + "_HLTCaloMET", HLTCaloMET[0], weightOnCalib);
-                vcp[s].FillHisto1F(selLabels_[s] + "_HLTCaloMHT", HLTCaloMHT[0], weightOnCalib);
-                vcp[s].FillHisto1F(selLabels_[s] + "_HLTPFMHT", HLTPFMHT[0], weightOnCalib);
-                vcp[s].FillHisto1F(selLabels_[s] + "_HLTPFMET", HLTPFMET[0], weightOnCalib);
-
-                if (*HLT_PFMET120_PFMHT120_IDTight && PFMHT>120) {
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_PFMET120_PFMHT120_IDTight___PseudoCaloMET", PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_PFMET120_PFMHT120_IDTight___RecoPFMET", RecoPFMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_PFMET120_PFMHT120_IDTight___PUppiMET", RecoPUppiMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_PFMET120_PFMHT120_IDTight___PUppiMETNoMu", PUppiMET_NoMu, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___HLT_PFMET120_PFMHT120_IDTight___PUppiMET_VS_PseudoMET", RecoPUppiMET[0], PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___HLT_PFMET120_PFMHT120_IDTight___PUppiMETNoMu_VS_PseudoMET", PUppiMET_NoMu, PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                }
-                if (*HLT_PFHT500_PFMET100_PFMHT100_IDTight && PFHT>500 && PFMHT>100) {
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_PFHT500_PFMET100_PFMHT100_IDTight___PseudoCaloMET", PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_PFHT500_PFMET100_PFMHT100_IDTight___RecoPFMET", RecoPFMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_PFHT500_PFMET100_PFMHT100_IDTight___PUppiMET", RecoPUppiMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_PFHT500_PFMET100_PFMHT100_IDTight___PUppiMETNoMu", PUppiMET_NoMu, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___HLT_PFHT500_PFMET100_PFMHT100_IDTight___PUppiMET_VS_PseudoMET", RecoPUppiMET[0], PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___HLT_PFHT500_PFMET100_PFMHT100_IDTight___PUppiMETNoMu_VS_PseudoMET", PUppiMET_NoMu, PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                }
-                if (*HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60 && PFMHTNoMu>120 && PFHT>60) {
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60___PseudoCaloMET", PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60___RecoPFMET", RecoPFMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60___PUppiMET", RecoPUppiMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60___PUppiMETNoMu", PUppiMET_NoMu, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60___PUppiMET_VS_PseudoMET", RecoPUppiMET[0], PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60___PUppiMETNoMu_VS_PseudoMET", PUppiMET_NoMu, PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                }
-                if (*HLT_MET105_IsoTrk50) {
-                    for (int iHSCP=0; iHSCP<(int)i_candPartialHSCP.size(); iHSCP++) vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_MET105_IsoTrk50___PFtrackPT", Pt[i_candPartialHSCP[iHSCP]], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_MET105_IsoTrk50___PseudoCaloMET", PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_MET105_IsoTrk50___RecoPFMET", RecoPFMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_MET105_IsoTrk50___PUppiMET", RecoPUppiMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___HLT_MET105_IsoTrk50___PUppiMETNoMu", PUppiMET_NoMu, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___HLT_MET105_IsoTrk50___PUppiMET_VS_PseudoMET", RecoPUppiMET[0], PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___HLT_MET105_IsoTrk50___PUppiMETNoMu_VS_PseudoMET", PUppiMET_NoMu, PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                }
-                if ((*HLT_PFMET120_PFMHT120_IDTight && PFMHT>120) || (*HLT_PFHT500_PFMET100_PFMHT100_IDTight && PFHT>500 && PFMHT>100)
-                    || (*HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60 && PFMHTNoMu>120 && PFHT>60) || *HLT_MET105_IsoTrk50) {
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMETtrg___PseudoCaloMET", PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMETtrg___RecoPFMET", RecoPFMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMETtrg___PUppiMET", RecoPUppiMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMETtrg___PUppiMETNoMu", PUppiMET_NoMu, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___orMETtrg___PUppiMET_VS_PseudoMET", RecoPUppiMET[0], PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___orMETtrg___PUppiMETNoMu_VS_PseudoMET", PUppiMET_NoMu, PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                }
-
-                    // 3 among 4 triggers have passed
-                if ((*HLT_PFMET120_PFMHT120_IDTight && PFMHT>120) || (*HLT_PFHT500_PFMET100_PFMHT100_IDTight && PFHT>500 && PFMHT>100)
-                    || (*HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60 && PFMHTNoMu>120 && PFHT>60)) {
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMET3a4trg1___PseudoCaloMET", PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMET3a4trg1___RecoPFMET", RecoPFMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMET3a4trg1___PUppiMET", RecoPUppiMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMET3a4trg1___PUppiMETNoMu", PUppiMET_NoMu, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___orMET3a4trg1___PUppiMET_VS_PseudoMET", RecoPUppiMET[0], PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___orMET3a4trg1___PUppiMETNoMu_VS_PseudoMET", PUppiMET_NoMu, PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                }
-                if ((*HLT_PFMET120_PFMHT120_IDTight && PFMHT>120) || (*HLT_PFHT500_PFMET100_PFMHT100_IDTight && PFHT>500 && PFMHT>100)
-                        || *HLT_MET105_IsoTrk50) {
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMET3a4trg2___PseudoCaloMET", PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMET3a4trg2___RecoPFMET", RecoPFMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMET3a4trg2___PUppiMET", RecoPUppiMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMET3a4trg2___PUppiMETNoMu", PUppiMET_NoMu, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___orMET3a4trg2___PUppiMET_VS_PseudoMET", RecoPUppiMET[0], PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___orMET3a4trg2___PUppiMETNoMu_VS_PseudoMET", PUppiMET_NoMu, PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                }
-                if ((*HLT_PFMET120_PFMHT120_IDTight && PFMHT>120) || (*HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60 && PFMHTNoMu>120 && PFHT>60)
-                        || *HLT_MET105_IsoTrk50) {
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMET3a4trg3___PseudoCaloMET", PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMET3a4trg3___RecoPFMET", RecoPFMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMET3a4trg3___PUppiMET", RecoPUppiMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMET3a4trg3___PUppiMETNoMu", PUppiMET_NoMu, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___orMET3a4trg3___PUppiMET_VS_PseudoMET", RecoPUppiMET[0], PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___orMET3a4trg3___PUppiMETNoMu_VS_PseudoMET", PUppiMET_NoMu, PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                }
-                if ((*HLT_PFHT500_PFMET100_PFMHT100_IDTight && PFHT>500 && PFMHT>100) || (*HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60 && PFMHTNoMu>120 && PFHT>60)
-                        || *HLT_MET105_IsoTrk50) {
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMET3a4trg4___PseudoCaloMET", PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMET3a4trg4___RecoPFMET", RecoPFMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMET3a4trg4___PUppiMET", RecoPUppiMET[0], weightOnCalib);
-                    vcp[s].FillHisto1F(selLabels_[s] + "_if___orMET3a4trg4___PUppiMETNoMu", PUppiMET_NoMu, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___orMET3a4trg4___PUppiMET_VS_PseudoMET", RecoPUppiMET[0], PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                    vcp[s].FillHisto2F(selLabels_[s] + "_if___orMET3a4trg4___PUppiMETNoMu_VS_PseudoMET", PUppiMET_NoMu, PseudoCaloMET[0]*isRescaled, weightOnCalib);
-                }
-            }  
+    for (unsigned int m = 0; m < muonPt.GetSize(); ++m) {
+        if (m < muonIsPF.GetSize() && muonIsPF[m]) {
+            const double muPt = muonPt[m];
+            const double muPhi = muonPhi[m];
+            PFMHTNoMu_x_ -= muPt * std::cos(muPhi);
+            PFMHTNoMu_y_ -= muPt * std::sin(muPhi);
+            PUppiMET_x_ -= muPt * std::cos(muPhi);
+            PUppiMET_y_ -= muPt * std::sin(muPhi);
         }
     }
+
+    PFMHT_ = std::sqrt(PFMHT_x_ * PFMHT_x_ + PFMHT_y_ * PFMHT_y_);
+    PFMHTNoMu_ = std::sqrt(PFMHTNoMu_x_ * PFMHTNoMu_x_ + PFMHTNoMu_y_ * PFMHTNoMu_y_);
+    PUppiMET_NoMu_ = std::sqrt(PUppiMET_x_ * PUppiMET_x_ + PUppiMET_y_ * PUppiMET_y_);
+}
+
+void MET_efficiency::fillHistograms() {
+    for (std::size_t s = 0; s < selLabels_.size(); ++s) {
+        const std::string& label = selLabels_[s];
+        const double weight = value(weightPU_);
+        const double scale = (label.find("PseudoMETrescaled") != std::string::npos) ? 163.451 / 146.864 : 1.0;
+        const double pseudoCaloMET = value(PseudoMET_viaCaloJets_) * scale;
+        const double recoPFMET = value(RecoPFMET_);
+        const double l1MET = value(L1MET_);
+        const double hltCaloMET = value(HLTCaloMET_);
+        const double hltCaloMHT = value(HLTCaloMHT_);
+        const double hltPFMHT = value(HLTPFMHT_);
+        const double hltPFMET = value(HLTPFMET_);
+        const double recoPuppiMET = value(RecoPuppiMET_);
+        const bool hltPFMET120 = value(HLT_PFMET120_PFMHT120_IDTight_);
+        const bool hltPFHT500 = value(HLT_PFHT500_PFMET100_PFMHT100_IDTight_);
+        const bool hltNoMu120 = value(HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60_);
+        const bool hltIsoTrk50 = value(HLT_MET105_IsoTrk50_);
+
+        auto& store = hists[s];
+        const std::vector<std::pair<std::string, double>> hist1 = {
+            {label + "_PUppiMET", recoPuppiMET},
+            {label + "_PUppiMETNoMu", PUppiMET_NoMu_},
+            {label + "_PseudoCaloMET", pseudoCaloMET},
+            {label + "_RecoPFMET", recoPFMET},
+            {label + "_L1MET", l1MET},
+            {label + "_HLTCaloMET", hltCaloMET},
+            {label + "_HLTCaloMHT", hltCaloMHT},
+            {label + "_HLTPFMHT", hltPFMHT},
+            {label + "_HLTPFMET", hltPFMET}
+        };
+        for (const auto& [name, value] : hist1) {
+            if (!store.h1[name]) {
+                store.h1[name] = new TH1F(name.c_str(), name.c_str(), 100, 0.0, axisMax1D(name));
+                store.h1[name]->Sumw2();
+            }
+            store.h1[name]->Fill(value, weight);
+        }
+
+        if (hltPFMET120 && PFMHT_ > 120.0) {
+            const std::string name = label + "_if___HLT_PFMET120_PFMHT120_IDTight___PseudoCaloMET";
+            if (!store.h1[name]) {
+                store.h1[name] = new TH1F(name.c_str(), name.c_str(), 100, 0.0, axisMax1D(name));
+                store.h1[name]->Sumw2();
+            }
+            store.h1[name]->Fill(pseudoCaloMET, weight);
+        }
+
+        if (hltPFHT500 && PFHT_ > 500.0 && PFMHT_ > 100.0) {
+            const std::string name = label + "_if___HLT_PFHT500_PFMET100_PFMHT100_IDTight___PseudoCaloMET";
+            if (!store.h1[name]) {
+                store.h1[name] = new TH1F(name.c_str(), name.c_str(), 100, 0.0, axisMax1D(name));
+                store.h1[name]->Sumw2();
+            }
+            store.h1[name]->Fill(pseudoCaloMET, weight);
+        }
+
+        if (hltNoMu120 && PFMHTNoMu_ > 120.0 && PFHT_ > 60.0) {
+            const std::string name = label + "_if___HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60___PseudoCaloMET";
+            if (!store.h1[name]) {
+                store.h1[name] = new TH1F(name.c_str(), name.c_str(), 100, 0.0, axisMax1D(name));
+                store.h1[name]->Sumw2();
+            }
+            store.h1[name]->Fill(pseudoCaloMET, weight);
+        }
+
+        if (hltIsoTrk50) {
+            const std::string name = label + "_if___HLT_MET105_IsoTrk50___PFtrackPT";
+            if (!store.h1[name]) {
+                store.h1[name] = new TH1F(name.c_str(), name.c_str(), 100, 0.0, axisMax1D(name));
+                store.h1[name]->Sumw2();
+            }
+            const auto& pt = Array(Pt_);
+            const auto& hasTrack = Array(HSCP_hasTrack_);
+            for (unsigned int i = 0; i < pt.GetSize(); ++i) {
+                if (i < hasTrack.GetSize() && hasTrack[i]) {
+                    store.h1[name]->Fill(pt[i], weight);
+                }
+            }
+        }
+    }
+}
+
+void MET_efficiency::writeHistograms() {
+    if (!outputFileHandle_ || outputFileHandle_->IsZombie()) {
+        return;
+    }
+    outputFileHandle_->cd();
+    for (auto& store : hists) {
+        for (auto& item : store.h1) {
+            if (item.second) {
+                item.second->Write();
+            }
+        }
+        for (auto& item : store.h2) {
+            if (item.second) {
+                item.second->Write();
+            }
+        }
+    }
+    outputFileHandle_->Write();
+    outputFileHandle_->Close();
 }
