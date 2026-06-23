@@ -35,14 +35,16 @@ public:
             if (h1.find(name) != h1.end()) {
                 h1[name]->Fill(value, weight);
             } else {
-                std::cerr << "Histogram " << name << " not found!" << std::endl;
+                h1[name] = new TH1F(name.c_str(), name.c_str(), 100, 0, 100);
+                h1[name]->Fill(value, weight);
             }
         }
         void FillHisto2F(const std::string& name, double xvalue, double yvalue, double weight) {
             if (h2.find(name) != h2.end()) {
                 h2[name]->Fill(xvalue, yvalue, weight);
             } else {
-                std::cerr << "Histogram " << name << " not found!" << std::endl;
+                h2[name] = new TH2F(name.c_str(), name.c_str(), 100, 0, 100, 100, 0, 100);
+                h2[name]->Fill(xvalue, yvalue, weight);
             }
         }
     };
@@ -191,6 +193,7 @@ void MET_efficiency::bindBranches() {
     bindArray(*reader, HLTPFMET, "HLTPFMET");
     bindArray(*reader, RecoPFMET, "RecoPFMET");
     bindArray(*reader, PseudoMET_viaCaloJets, "PseudoMET_viaCaloJets");
+    bindArray(*reader, Flag_allMETFilters, "Flag_allMETFilters");
     bindArray(*reader, RecoPUppiMET, "RecoPuppiMET");
     bindArray(*reader, RecoPUppiMET_phi, "RecoPuppiMET_phi");
     bindArray(*reader, Jet_px, "puppijet_px");
@@ -334,7 +337,10 @@ void MET_efficiency::fillHistograms() {
                 if ( (Pt_[i_track] > 50.0) && (Pt_pseudo_[i_track] > 50.0) && (std::abs(Eta_[i_track]) < 2.4) && (NbPixelHit_noL1_[i_track] >= 2) && (FracOfValidHit_[i_track] > 0.8) && 
                 (NOM_noL1_[i_track] >= 10) && (isHighPurityTrack_[i_track] == true) && (normChi2_[i_track] < 5.0) && (std::abs(dz_[i_track]) < 0.1) && (std::abs(dxy_[i_track]) < 0.02) && 
                 (miniRelIsoAll_[i_track] < 0.02) && (EoP_[i_track] < 0.3) && (IsoSumPt_dr03_[i_track] < 15) && (ptOverptErrptErr_[i_track] < 0.0008) && 
-                (Fpix_[i_track] < 0.9)) { hadPassedHSCP++; i_candPartialHSCP.push_back(i_track); };
+                (Fpix_[i_track] < 0.9)) { 
+                    hadPassedHSCP++;
+                    i_candPartialHSCP.push_back(i_track); 
+                };
 
                 i_track++;
             }
@@ -458,14 +464,17 @@ void MET_efficiency::fillHistograms() {
 
             unsigned int i_track = 0;
             std::vector <unsigned int> i_candPartialHSCP;
-            for(unsigned int j=0; j<HSCP_hasTrack_.GetSize(); j++){    
+            for(unsigned int j=0; j<HSCP_hasTrack_.GetSize(); j++){   
 
                 if (!HSCP_hasTrack_[j]) continue;
 
                 if ( (Flag_allMETFilters_[0] == true) && (Pt_[i_track] > 50.0) && (Pt_pseudo_[i_track] > 50.0) && (std::abs(Eta_[i_track]) < 2.4) && (NbPixelHit_noL1_[i_track] >= 2) && 
                 (FracOfValidHit_[i_track] > 0.8) && (NOM_noL1_[i_track] >= 10) && (isHighPurityTrack_[i_track] == true) && (normChi2_[i_track] < 5.0) && (std::abs(dz_[i_track]) < 0.1) &&
                 (std::abs(dxy_[i_track]) < 0.02) && (miniRelIsoAll_[i_track] < 0.02) && (EoP_[i_track] < 0.3) && (IsoSumPt_dr03_[i_track] < 15) && (ptOverptErrptErr_[i_track] < 0.0008) && 
-                (Fpix_[i_track] > 0.3) && (ptOverptErr_[i_track] < 1) && (Ih_Strip_[i_track] > 2.9784)) { hadPassedHSCP++; i_candPartialHSCP.push_back(i_track); };
+                (Fpix_[i_track] > 0.3) && (ptOverptErr_[i_track] < 1) && (Ih_Strip_[i_track] > 2.9784)) { 
+                    hadPassedHSCP++; 
+                    i_candPartialHSCP.push_back(i_track); 
+                };
 
                 i_track++;
             }
@@ -577,6 +586,7 @@ void MET_efficiency::fillHistograms() {
 
 void MET_efficiency::writeHistograms() {
     if (!outputFileHandle || outputFileHandle->IsZombie()) {
+        std::cerr << "Error: Output file handle is not valid. Cannot write histograms." << std::endl;
         return;
     }
     outputFileHandle->cd();
