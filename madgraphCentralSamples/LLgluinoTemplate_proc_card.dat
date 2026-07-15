@@ -1,0 +1,9 @@
+import model MSSM_SLHA2
+define p = g u c d s b u~ c~ d~ s~ b~
+define j = g u c d s b u~ c~ d~ s~ b~
+
+generate p p > go go @1
+add process p p > go go j @2
+add process p p > go go j j @3
+
+output LLgluino_M-1000_tau-1ns_ttbarQuarkDecay_chi10_M-100 -nojpeg
