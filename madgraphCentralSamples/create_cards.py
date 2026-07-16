@@ -9,8 +9,8 @@ from pathlib import Path
 
 
 GLUINO_MASSES = [1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600]
-TAUS = ["300ps", "1ns", "3ns", "10ns", "30ns"]
-WIDTHS = ["2.200000E-15", "6.600000E-16", "2.200000E-16", "6.600000E-17", "2.200000E-17"]
+TAUS = ["100ps", "300ps", "1ns", "3ns", "10ns", "30ns"]
+WIDTHS = ["6.600000E-15", "2.200000E-15", "6.600000E-16", "2.200000E-16", "6.600000E-17", "2.200000E-17"]
 DECAYS = ["udsQuarkDecay", "ttbarQuarkDecay"]
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -20,7 +20,6 @@ TEMPLATE_PROC_CARD = SCRIPT_DIR / "LLgluinoTemplate_proc_card.dat"
 OUTPUT_DIR = SCRIPT_DIR / "InputCards"
 GLUINO_TEMPLATE_MASS = 1000.0
 NEUTRALINO_TEMPLATE_MASS = 100.0
-
 
 def replace_gluino_mass(line: str, gluino_mass: int) -> str:
     return re.sub(
@@ -104,6 +103,7 @@ def main() -> None:
         raise FileNotFoundError(f"Missing template card: {TEMPLATE_PROC_CARD}")
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    COUNTER=0
 
     for gluino_mass in GLUINO_MASSES:
         neutralino_masses = [100, gluino_mass - 100]
@@ -111,8 +111,14 @@ def main() -> None:
             for tau in TAUS:
                 for decay in DECAYS:
                     name = f"LLgluino_M-{gluino_mass}_tau-{tau}_{decay}_chi10_M-{neutralino_mass}"
+                    width_index = TAUS.index(tau)
+                    WIDTH = WIDTHS[width_index]
+                    if skipSample(gluino_mass, neutralino_mass, tau, decay):
+                        continue
+
                     sample_dir = OUTPUT_DIR / name
                     sample_dir.mkdir(parents=True, exist_ok=True)
+                    COUNTER+=1
 
                     param_card = sample_dir / f"{name}_param_card.dat"
                     run_card = sample_dir / f"{name}_run_card.dat"
@@ -122,8 +128,6 @@ def main() -> None:
                     shutil.copyfile(TEMPLATE_RUN_CARD, run_card)
                     shutil.copyfile(TEMPLATE_PROC_CARD, proc_card)
 
-                    width_index = TAUS.index(tau)
-                    WIDTH = WIDTHS[width_index]
                     update_param_card(param_card, gluino_mass, neutralino_mass, WIDTH, decay)
 
                     proc_text = proc_card.read_text()
@@ -145,6 +149,18 @@ def main() -> None:
                     run_card.write_text(run_text)
 
                     print(f"Created {sample_dir}")
+    print(f"Total samples created: {COUNTER}")
+
+def skipSample(gluino_mass: int, neutralino_mass: int, tau: str, decay: str) -> bool:
+    if ((decay == "ttbarQuarkDecay" and gluino_mass-neutralino_mass == 100) or
+        (tau == "100ps" and gluino_mass >= 1400) or
+        (tau == "300ps" and gluino_mass >= 2200) or
+        (tau == "1ns" and gluino_mass >= 2600) or
+        (tau == "300ps" and gluino_mass == 2000 and gluino_mass-neutralino_mass == 100) or
+        (tau == "1ns" and gluino_mass == 2400 and gluino_mass-neutralino_mass == 100) or
+        ((tau == "3ns" or tau == "10ns" or tau == "30ns") and gluino_mass == 2600 and gluino_mass-neutralino_mass == 100)):
+        return True
+    return False
 
 
 if __name__ == "__main__":
