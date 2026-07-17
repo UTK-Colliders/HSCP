@@ -53,8 +53,21 @@ BLOCK MINPAR  # Input parameters - minimal models
 #
 BLOCK MASS  # Mass Spectrum
 # PDG code           mass       particle
+         1     4.67000000E-03   # d
+         2     2.16000000E-03   # u
+         3     9.30000000E-02   # s
+         4     1.27000000E+00   # c
          5     4.88991651E+00   # b-quark pole mass calculated from mb(mb)_Msbar
          6     1.75000000E+02   # mt pole mass (not read by ME)
+        11     5.10998950E-04   # e-
+        12     0.00000000E+00   # nu_e
+        13     1.05658375E-01   # mu-
+        14     0.00000000E+00   # nu_mu
+        15     1.77686000E+00   # tau-
+        16     0.00000000E+00   # nu_tau
+        21     0.00000000e+00     # g
+        22     0.00000000e+00     # a
+        23     9.11876000E+01   # mz
         24     7.98290131E+01   # W+
         25     1.25899057E+02   # h
         35     3.99960116E+05   # H
@@ -226,6 +239,22 @@ BLOCK MSOFT Q=  4.67034192E+02  # The soft SUSY breaking masses at the scale Q
     49     5.19867261E+02   # mbR(Q)            
 #
 #         PDG            Width
+DECAY        6 1.561950e+00 # wt
+DECAY        23 2.411433e+00 # wz
+DECAY        24 2.002822e+00 # ww
+DECAY        1 0.000000e+00 # d
+DECAY        2 0.000000e+00 # u
+DECAY        3 0.000000e+00 # s
+DECAY        4 0.000000e+00 # c
+DECAY        5 0.000000e+00 # b
+DECAY        11 0.000000e+00 # e-
+DECAY        12 0.000000e+00 # ve
+DECAY        13 0.000000e+00 # mu-
+DECAY        14 0.000000e+00 # vm
+DECAY        15 0.000000e+00 # ta-
+DECAY        16 0.000000e+00 # vt
+DECAY        21 0.000000e+00 # g
+DECAY        22 0.000000e+00 # a
 DECAY        25     1.98610799E-03   # h decays
 #          BR         NDA      ID1       ID2
      1.45642955E-01    2          15       -15   # BR(H1 -> tau- tau+)

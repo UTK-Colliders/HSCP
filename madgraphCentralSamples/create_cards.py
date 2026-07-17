@@ -27,7 +27,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 TEMPLATE_PARAM_CARD = SCRIPT_DIR / "LLgluinoTemplate_param_card.dat"
 TEMPLATE_RUN_CARD = SCRIPT_DIR / "LLgluinoTemplate_run_card.dat"
 TEMPLATE_PROC_CARD = SCRIPT_DIR / "LLgluinoTemplate_proc_card.dat"
-OUTPUT_DIR = SCRIPT_DIR / "InputCards"
+OUTPUT_DIR = Path("genproductions_scripts/bin/MadGraph5_aMCatNLO/InputCards")
 GLUINO_TEMPLATE_MASS = 1000.0
 NEUTRALINO_TEMPLATE_MASS = 100.0
 
