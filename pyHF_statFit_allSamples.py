@@ -3,9 +3,11 @@
 
 import argparse
 import csv
+import os
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.colors import LogNorm
+from matplotlib.ticker import ScalarFormatter
 from pyHF_statFit import StatFit
 
 def read_signal_points(csv_path):
@@ -30,15 +32,22 @@ def compute_upper_limits(signal_points, do_debug_print=False):
     obs_limits = {}
     exp_limits_median = {}
 
+    os.makedirs("pdfs", exist_ok=True)
+
     for point in signal_points:
         gluinoMass = point["gluinoMass"]
         tau = point["tau"]
+        neutralinoMass = point["neutralinoMass"]
+        quarkDecay = point["quarkDecay"]
         print(f"Running hypothesis test for gluinoMass={gluinoMass:.0f} GeV, tau={tau} ns")
 
         stat_fit = StatFit(point["n_signal"], point["n_background"], point["background_uncertainty"], do_debug_print)
         observations = [point["n_observed"]] + stat_fit.model.config.auxdata
 
         poi_values, results, obs_limit, exp_limits = stat_fit.set_limits(observations)
+
+        brazil_output = f"pdfs/gluinoMass{gluinoMass:.0f}_tau{tau:g}_neutralinoMass{neutralinoMass:.0f}_quarkDecay{quarkDecay}_limit.pdf"
+        stat_fit.plot_limits(poi_values, results, brazil_output)
 
         obs_limits[(gluinoMass, tau)] = obs_limit
         exp_limits_median[(gluinoMass, tau)] = exp_limits[2]
@@ -65,7 +74,7 @@ def plot_exclusion(gluinoMasses, taus, Z_obs, Z_exp, output):
     ax.set_title(r"TEST ($\mu$ Upper Limit)")
     ax.set_ylabel(r"$m_{\tilde{g}}$ (GeV)")
     ax.set_xlabel(r"$\tau$ (ns)")
-    ax.set_yscale("log")
+    ax.set_xscale("log")
 
     mesh = ax.pcolormesh(taus, gluinoMasses, Z_obs, shading="nearest", norm=LogNorm(), cmap="RdYlBu_r")
     fig.colorbar(mesh, ax=ax, label=r"95% CL upper limit on $\mu$")
@@ -74,6 +83,13 @@ def plot_exclusion(gluinoMasses, taus, Z_obs, Z_exp, output):
     # i.e. the exclusion boundary
     ax.contour(taus, gluinoMasses, Z_obs, levels=[1.0], colors="black", linewidths=2)
     ax.contour(taus, gluinoMasses, Z_exp, levels=[1.0], colors="red", linestyles="dashed", linewidths=2)
+
+    # Only tick the actual gluino mass / tau values that came from the csv, not
+    # whatever matplotlib would pick on its own for a log axis
+    ax.set_xticks(taus)
+    ax.set_yticks(gluinoMasses)
+    ax.xaxis.set_major_formatter(ScalarFormatter())
+    ax.xaxis.set_minor_formatter(plt.NullFormatter())
 
     plt.savefig(output)
 
