@@ -4,7 +4,7 @@
 
 import pyhf
 import argparse
-
+import numpy as np
 
 def build_model(n_signal, n_background, background_uncertainty):
     model = pyhf.simplemodels.uncorrelated_background(
@@ -23,13 +23,36 @@ def background_only_parameters(model, pars):
 
 def compute_log_likelihood(model, n_observed, sigPlusBkg_pars, bkg_pars):
     observations = [n_observed] + model.config.auxdata
+    log_likelihood_sigPlusBkg = model.logpdf(pars=sigPlusBkg_pars, data=observations)
+    log_likelihood_BkgOnly = model.logpdf(pars=bkg_pars, data=observations)
     if do_debug_print:
-        print(f"Log likelihood for signal + background model: {model.logpdf(pars=sigPlusBkg_pars, data=observations)}")
-        print(f"Log likelihood for background only model: {model.logpdf(pars=bkg_pars, data=observations)}")
+        print(f"Log likelihood for signal + background model: {log_likelihood_sigPlusBkg}")
+        print(f"Log likelihood for background only model: {log_likelihood_BkgOnly}")
 
-    return model.logpdf(pars=sigPlusBkg_pars, data=observations), model.logpdf(pars=bkg_pars, data=observations)
+    return log_likelihood_sigPlusBkg, log_likelihood_BkgOnly
+
+def perform_fit(model, n_observed):
+    observations = [n_observed] + model.config.auxdata
+    fit = pyhf.infer.mle.fit(data=observations, pdf=model)
+    if do_debug_print:
+        print(f"Model parameter best fits: {fit}")
+        print("-----END DEBUG INFO-----\n")
+
+    return fit
+
+def perform_SM_only_hypothesis_test(model, n_observed):
+    CLs_obs, CLs_exp = pyhf.infer.hypotest(
+        1.0,  # null hypothesis (BSM physics exists)
+        [n_observed] + model.config.auxdata,
+        model, test_stat="qtilde", return_expected_set=True,
+    )
+
+    print(f"      Observed CLs: {CLs_obs:.4f}")
+    for expected_value, n_sigma in zip(CLs_exp, np.arange(-2, 3)):
+        print(f"Expected CLs({n_sigma:2d} σ): {expected_value:.4f}")
 
 def debug_print(model):
+    print("-----DEBUG INFO-----")
     print(f"  channels: {model.config.channels}")
     print(f"     nbins: {model.config.channel_nbins}")
     print(f"   samples: {model.config.samples}")
@@ -40,7 +63,7 @@ def debug_print(model):
 
     print(f"Suggested initial parameters:          {model.config.suggested_init()}")
     print(f"Suggested parameter bounds:            {model.config.suggested_bounds()}")
-    print(f"Should parameters be fixed during fit: {model.config.suggested_fixed()}")
+    print(f"Should parameters be fixed during fit: {model.config.suggested_fixed()}\n")
 
 def main():
     parser = argparse.ArgumentParser(description="Perform a single-channel statistical fit with uncorrelated background")
@@ -67,6 +90,12 @@ def main():
 
     # Compute the loglikelihood
     compute_log_likelihood(model, args.n_observed, init_pars, bkg_pars)
+
+    # Perform the model parameter fit
+    fit = perform_fit(model, args.n_observed)
+
+    # Perform the SM only hypothesis test
+    perform_SM_only_hypothesis_test(model, args.n_observed)
 
 if __name__ == "__main__":
     main()
