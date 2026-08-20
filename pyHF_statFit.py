@@ -1,10 +1,12 @@
 # First run `/usr/bin/python3.12 -m venv pyHF`, followed by `source pyHF/bin/activate` to access the pyhf library
-# For your first time, run `pip install pyhf`
+# For your first time, run `pip install pyhf` and `pip install matplotlib`
 # Run `deactivate` when you are done with the venv
 
 import pyhf
 import argparse
 import numpy as np
+from matplotlib import pyplot as plt
+from pyhf.contrib.viz import brazil
 
 def build_model(n_signal, n_background, background_uncertainty):
     model = pyhf.simplemodels.uncorrelated_background(
@@ -21,8 +23,7 @@ def background_only_parameters(model, pars):
     bkg_pars[model.config.poi_index] = 0
     return bkg_pars
 
-def compute_log_likelihood(model, n_observed, sigPlusBkg_pars, bkg_pars):
-    observations = [n_observed] + model.config.auxdata
+def compute_log_likelihood(model, observations, sigPlusBkg_pars, bkg_pars):
     log_likelihood_sigPlusBkg = model.logpdf(pars=sigPlusBkg_pars, data=observations)
     log_likelihood_BkgOnly = model.logpdf(pars=bkg_pars, data=observations)
     if do_debug_print:
@@ -31,8 +32,7 @@ def compute_log_likelihood(model, n_observed, sigPlusBkg_pars, bkg_pars):
 
     return log_likelihood_sigPlusBkg, log_likelihood_BkgOnly
 
-def perform_fit(model, n_observed):
-    observations = [n_observed] + model.config.auxdata
+def perform_fit(model, observations):
     fit = pyhf.infer.mle.fit(data=observations, pdf=model)
     if do_debug_print:
         print(f"Model parameter best fits: {fit}")
@@ -40,16 +40,34 @@ def perform_fit(model, n_observed):
 
     return fit
 
-def perform_SM_only_hypothesis_test(model, n_observed):
+def perform_SM_only_hypothesis_test(model, observations):
     CLs_obs, CLs_exp = pyhf.infer.hypotest(
         1.0,  # null hypothesis (BSM physics exists)
-        [n_observed] + model.config.auxdata,
-        model, test_stat="qtilde", return_expected_set=True,
+        observations, model, test_stat="qtilde", return_expected_set=True,
     )
 
     print(f"      Observed CLs: {CLs_obs:.4f}")
     for expected_value, n_sigma in zip(CLs_exp, np.arange(-2, 3)):
         print(f"Expected CLs({n_sigma:2d} σ): {expected_value:.4f}")
+
+def set_limits(model, observations):
+    poi_values = np.linspace(0.1, 5, 50)
+    obs_limit, exp_limits, (scan, results) = pyhf.infer.intervals.upper_limits.upper_limit(
+        observations, model, poi_values, level=0.05, return_results=True
+    )
+
+    print(f"Upper limit (obs): μ = {obs_limit:.4f}")
+    print(f"Upper limit (exp): μ = {exp_limits[2]:.4f}")
+
+    return poi_values, results
+
+def plot_limits(poi_values, results, output):
+    fig, ax = plt.subplots()
+    fig.set_size_inches(10.5, 7)
+    ax.set_title("Hypothesis Tests")
+
+    artists = brazil.plot_results(poi_values, results, ax=ax)
+    plt.savefig(output)
 
 def debug_print(model):
     print("-----DEBUG INFO-----")
@@ -71,12 +89,14 @@ def main():
     parser.add_argument("--n_background", type=float, default=1.0, help="Number of background events expected in the signal region")
     parser.add_argument("--background_uncertainty", type=float, default=1.0, help="Uncertainty on number of background events expected in the signal region. For example, if the number of background events is 50 +- 5, you would pass 5 into this argument.")
     parser.add_argument("--n_observed", type=int, default=1, help="Number of events observed in data in the signal region")
+    parser.add_argument("--limitPlotOutput", default = "output.pdf")
     parser.add_argument("--do_debug_print", type=bool, default=False)
     args = parser.parse_args()
     global do_debug_print
     do_debug_print = args.do_debug_print
 
     model = build_model(args.n_signal, args.n_background, args.background_uncertainty)
+    observations = [args.n_observed] + model.config.auxdata
 
     # For a single channel, the parameters are [mu, gamma_b] (see https://pyhf.github.io/pyhf-tutorial/helloworld/)
     # Mu is the signal strength, gamma_b is a multiplicative factor calculated by the background uncertainty given an uncorrelated background
@@ -89,13 +109,17 @@ def main():
     model.expected_actualdata(bkg_pars)
 
     # Compute the loglikelihood
-    compute_log_likelihood(model, args.n_observed, init_pars, bkg_pars)
+    compute_log_likelihood(model, observations, init_pars, bkg_pars)
 
     # Perform the model parameter fit
-    fit = perform_fit(model, args.n_observed)
+    perform_fit(model, observations)
 
     # Perform the SM only hypothesis test
-    perform_SM_only_hypothesis_test(model, args.n_observed)
+    perform_SM_only_hypothesis_test(model, observations)
+
+    # Set upper limits and plot them
+    poi_values, results = set_limits(model, observations)
+    plot_limits(poi_values, results, args.limitPlotOutput)
 
 if __name__ == "__main__":
     main()
