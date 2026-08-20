@@ -60,7 +60,7 @@ class StatFit:
         print(f"Upper limit (obs): μ = {obs_limit:.4f}")
         print(f"Upper limit (exp): μ = {exp_limits[2]:.4f}")
 
-        return poi_values, results
+        return poi_values, results, obs_limit, exp_limits
 
     def plot_limits(self, poi_values, results, output):
         fig, ax = plt.subplots()
@@ -117,7 +117,7 @@ def main():
     stat_fit.perform_SM_only_hypothesis_test(observations)
 
     # Set upper limits and plot them
-    poi_values, results = stat_fit.set_limits(observations)
+    poi_values, results, obs_limit, exp_limits = stat_fit.set_limits(observations)
     stat_fit.plot_limits(poi_values, results, args.limitPlotOutput)
 
 if __name__ == "__main__":
