@@ -7,6 +7,7 @@ import argparse
 import numpy as np
 from matplotlib import pyplot as plt
 from pyhf.contrib.viz import brazil
+import mplhep as hep
 
 class StatFit:
     def __init__(self, n_signal, n_background, background_uncertainty, gluino_mass=1000, neutralino_mass=100, tau=0.1, quark_decay="uds", do_debug_print=False):
@@ -105,17 +106,20 @@ class StatFit:
             decayString = fr"$\tilde{{g}} \rightarrow \tilde{{\chi}}^0_1 + (u\bar{{u}},d\bar{{d}},s\bar{{s}})$"
         else:
             decayString = fr"$\tilde{{g}} \rightarrow \tilde{{\chi}}^0_1 + t\bar{{t}}$"
-        plt.text(.65, .99, fr'$m_{{\tilde{{g}}}}={self.gluino_mass}$ [GeV]', ha='left', va='top', transform=ax.transAxes)
-        plt.text(.65, .94, fr'$\tau_{{\tilde{{g}}}}={self.tau}$ [ns]', ha='left', va='top', transform=ax.transAxes)
-        plt.text(.65, .89, decayString, ha='left', va='top', transform=ax.transAxes)
-        plt.text(.65, .84, fr'$m_{{\tilde{{\chi}}^0_1}}={self.neutralino_mass}$ [GeV]', ha='left', va='top', transform=ax.transAxes)
+        plt.text(.65, .99, fr'$m_{{\tilde{{g}}}}={self.gluino_mass}$ [GeV]', ha='left', va='top', transform=ax.transAxes, fontname="TeX Gyre Heros", size=10)
+        plt.text(.65, .94, fr'$\tau_{{\tilde{{g}}}}={self.tau}$ [ns]', ha='left', va='top', transform=ax.transAxes, fontname="TeX Gyre Heros", size=10)
+        plt.text(.65, .89, decayString, ha='left', va='top', transform=ax.transAxes, fontname="TeX Gyre Heros", size=10)
+        plt.text(.65, .84, fr'$m_{{\tilde{{\chi}}^0_1}}={self.neutralino_mass}$ [GeV]', ha='left', va='top', transform=ax.transAxes, fontname="TeX Gyre Heros", size=10)
 
-        title = fr"FAKE! NOT REAL! Hypothesis Test"
-        ax.set_title(title)
+        # Fake results for testing warning
+        plt.text(0.01, 0.94, "Fake results for testing", transform=ax.transAxes, fontname="TeX Gyre Heros", size=20, fontweight='bold')
 
         artists = brazil.plot_results(x_sec_scan, results, ax=ax)
         ax.set_xlabel(r"$\sigma$ [fb]")
         ax.legend(loc="best")
+
+        # CMS specific
+        hep.cms.label("Work in progress", loc=0, ax=ax, fontsize=18, fontproperties="TeX Gyre Heros:italic", com=13.6, lumi=283.8)
 
         plt.savefig(output)
 

@@ -10,6 +10,7 @@ from matplotlib.colors import LogNorm
 from matplotlib.ticker import ScalarFormatter
 from matplotlib.lines import Line2D
 from pyHF_statFit import StatFit
+import mplhep as hep
 
 def read_signal_points(csv_path):
     signal_points = []
@@ -128,13 +129,16 @@ def plot_xsec_limit_vs_mass(mass_to_results, xsecDict, tau, quarkDecay, massSpli
     fig, ax = plt.subplots()
     fig.set_size_inches(10.5, 7)
 
-    plt.text(.55, .99, fr"$\tau_{{\tilde{{g}}}}={tau}$ [ns]", ha='left', va='top', transform=ax.transAxes)    
-    plt.text(.55, .94, decayString, ha='left', va='top', transform=ax.transAxes)
-    plt.text(.55, .89, neutralinoMassString, ha='left', va='top', transform=ax.transAxes)
+    plt.text(.55, .99, fr"$\tau_{{\tilde{{g}}}}={tau}$ [ns]", ha='left', va='top', transform=ax.transAxes, fontname="TeX Gyre Heros", size=10)    
+    plt.text(.55, .94, decayString, ha='left', va='top', transform=ax.transAxes, fontname="TeX Gyre Heros", size=10)
+    plt.text(.55, .89, neutralinoMassString, ha='left', va='top', transform=ax.transAxes, fontname="TeX Gyre Heros", size=10)
+
+    # Fake results for testing warning
+    plt.text(0.01, 0.94, "Fake results for testing", transform=ax.transAxes, fontname="TeX Gyre Heros", size=20, fontweight='bold')
 
     # Expected band (2 sigma, then 1 sigma on top)
-    ax.fill_between(masses, exp_xsec[-2], exp_xsec[2], color="#FFD700", label="Expected ± 2σ")
-    ax.fill_between(masses, exp_xsec[-1], exp_xsec[1], color="#00A651", label="Expected ± 1σ")
+    ax.fill_between(masses, exp_xsec[-2], exp_xsec[2], color="#ffcc00", label="Expected ± 2σ")
+    ax.fill_between(masses, exp_xsec[-1], exp_xsec[1], color="#228b22", label="Expected ± 1σ")
     ax.plot(masses, exp_xsec[0], color="black", linestyle="--", label="Expected limit")
 
     # Observed limit
@@ -149,7 +153,8 @@ def plot_xsec_limit_vs_mass(mass_to_results, xsecDict, tau, quarkDecay, massSpli
     ax.set_xlabel(r"$m_{\tilde{g}}$ [GeV]")
     ax.set_ylabel("95% CL upper limit on σ [fb]")
     ax.set_xticks(masses)
-    ax.set_title("FAKE! NOT REAL! Exclusion plot")
+    # CMS specific
+    hep.cms.label("Work in progress", loc=0, ax=ax, fontsize=18, fontproperties="TeX Gyre Heros:italic", com=13.6, lumi=283.8)
     ax.legend(loc="upper right")
 
     plt.savefig(output)
@@ -188,13 +193,16 @@ def plot_massVstau_exclusion(taus, gluinoMasses, massSplitting, quarkDecay, Z_ob
     else:
         neutralinoMassString = fr'$m_{{\tilde{{\chi}}^0_1}}=100$ [GeV]'
  
-    plt.text(.01, .99, decayString, ha='left', va='top', transform=ax.transAxes)
-    plt.text(.01, .94, neutralinoMassString, ha='left', va='top', transform=ax.transAxes)
+    plt.text(.01, .89, decayString, ha='left', va='top', transform=ax.transAxes, fontname="TeX Gyre Heros", size=10)
+    plt.text(.01, .84, neutralinoMassString, ha='left', va='top', transform=ax.transAxes, fontname="TeX Gyre Heros", size=10)
+
+    # Fake results for testing warning
+    plt.text(0.01, 0.94, "Fake results for testing", transform=ax.transAxes, fontname="TeX Gyre Heros", size=20, fontweight='bold')
 
     tau_positions = np.arange(len(taus)) 
     zmin, zmax = 1e-2, 1e3
     norm = LogNorm(vmin=zmin, vmax=zmax)
-    mesh = ax.pcolormesh(tau_positions, gluinoMasses, Z_obs, shading="nearest", norm=norm, cmap="RdYlBu_r")
+    mesh = ax.pcolormesh(tau_positions, gluinoMasses, Z_obs, shading="nearest", norm=norm, cmap="viridis")
  
     cbar_ticks = np.logspace(np.log10(zmin), np.log10(zmax), num=6)
     cbar = fig.colorbar(mesh, ax=ax, label=r"95% CL upper limit on $\sigma$ [fb]", ticks=cbar_ticks)
@@ -214,7 +222,9 @@ def plot_massVstau_exclusion(taus, gluinoMasses, massSplitting, quarkDecay, Z_ob
     ax.set_xticks(tau_positions)
     ax.set_xticklabels([f"{tau:g}" for tau in taus])
     ax.set_yticks(gluinoMasses)
-    ax.set_title("FAKE! NOT REAL! Exclusion plot")
+
+    # CMS specific
+    hep.cms.label("Work in progress", loc=0, ax=ax, fontsize=18, fontproperties="TeX Gyre Heros:italic", com=13.6, lumi=283.8)
  
     plt.savefig(output)
     plt.close(fig)
