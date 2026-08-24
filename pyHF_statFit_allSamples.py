@@ -8,6 +8,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.colors import LogNorm
 from matplotlib.ticker import ScalarFormatter
+from matplotlib.lines import Line2D
 from pyHF_statFit import StatFit
 
 def read_signal_points(csv_path):
@@ -129,8 +130,8 @@ def plot_xsec_limit_vs_mass(mass_to_results, xsecDict, output="xsec_limit_vs_mas
 def build_grid(obs_limits, exp_limits_median):
     """obs_limits/exp_limits_median here are already filtered down to
     {(tau, gluinoMass): value} — see filter_limits()."""
-    taus = sorted(set(tau for tau, gluinoMass in obs_limits))
-    gluinoMasses = sorted(set(gluinoMass for tau, gluinoMass in obs_limits))
+    taus = [0.1,0.3,1,3,10,30]
+    gluinoMasses = [1000,1200,1400,1600,1800,2000,2200,2400,2600,2800]
 
     Z_obs = np.zeros((len(gluinoMasses), len(taus)))
     Z_exp = np.zeros((len(gluinoMasses), len(taus)))
@@ -145,12 +146,12 @@ def build_grid(obs_limits, exp_limits_median):
 
     return taus, gluinoMasses, Z_obs, Z_exp
 
-def plot_massVstau_exclusion(taus, gluinoMasses, massSpliting, quarkDecay, Z_obs, Z_exp, output):
+def plot_massVstau_exclusion(taus, gluinoMasses, massSplitting, quarkDecay, Z_obs, Z_exp, output):
     fig, ax = plt.subplots()
     fig.set_size_inches(10.5, 7)
-    ax.set_xlabel(r"$\tau$ (ns)")
-    ax.set_ylabel(r"$m_{\tilde{g}}$ (GeV)")
-
+    ax.set_xlabel(r"$\tau$ [ns]")
+    ax.set_ylabel(r"$m_{\tilde{g}}$ [GeV]")
+ 
     if quarkDecay == "uds":
         decayString = fr"$\tilde{{g}} \rightarrow \tilde{{\chi}}^0_1 + (u\bar{{u}},d\bar{{d}},s\bar{{s}})$"
     else:
@@ -159,25 +160,35 @@ def plot_massVstau_exclusion(taus, gluinoMasses, massSpliting, quarkDecay, Z_obs
         neutralinoMassString = fr'$m_{{\tilde{{\chi}}^0_1}}=m_{{\tilde{{g}}}}-100$ [GeV]'
     else:
         neutralinoMassString = fr'$m_{{\tilde{{\chi}}^0_1}}=100$ [GeV]'
-
+ 
     plt.text(.01, .99, decayString, ha='left', va='top', transform=ax.transAxes)
     plt.text(.01, .94, neutralinoMassString, ha='left', va='top', transform=ax.transAxes)
 
-    mesh = ax.pcolormesh(taus, gluinoMasses, Z_obs, shading="nearest", norm=LogNorm(), cmap="RdYlBu_r")
-    fig.colorbar(mesh, ax=ax, label=r"95% CL upper limit on $\sigma$ [fb]")
-
-    # mu = 1 is where the observed/expected limit equals the nominal signal prediction,
-    # i.e. the exclusion boundary
-    ax.contour(taus, gluinoMasses, Z_obs, levels=[1.0], colors="black", linewidths=2)
-    ax.contour(taus, gluinoMasses, Z_exp, levels=[1.0], colors="red", linestyles="dashed", linewidths=2)
-
-    # Only tick the actual gluino mass / tau values that came from the csv, not
-    # whatever matplotlib would pick on its own for a log axis
-    ax.set_xticks(taus)
+    tau_positions = np.arange(len(taus)) 
+    zmin, zmax = 1e-2, 1e3
+    norm = LogNorm(vmin=zmin, vmax=zmax)
+    mesh = ax.pcolormesh(tau_positions, gluinoMasses, Z_obs, shading="nearest", norm=norm, cmap="RdYlBu_r")
+ 
+    cbar_ticks = np.logspace(np.log10(zmin), np.log10(zmax), num=6)
+    cbar = fig.colorbar(mesh, ax=ax, label=r"95% CL upper limit on $\sigma$ [fb]", ticks=cbar_ticks)
+    cbar.ax.yaxis.set_major_formatter(ScalarFormatter())
+    cbar.ax.yaxis.set_minor_formatter(plt.NullFormatter())
+ 
+    ax.contour(tau_positions, gluinoMasses, Z_obs, levels=[1.0], colors="black", linewidths=2)
+    ax.contour(tau_positions, gluinoMasses, Z_exp, levels=[1.0], colors="red", linestyles="dashed", linewidths=2)
+ 
+    legend_handles = [
+        Line2D([0], [0], color="black", linewidth=2, label="Observed 95% CL exclusion"),
+        Line2D([0], [0], color="red", linewidth=2, linestyle="dashed", label="Expected 95% CL exclusion"),
+    ]
+    ax.legend(handles=legend_handles, loc="lower right")
+ 
+    # Ticks at the evenly-spaced index positions, labeled with the real tau values
+    ax.set_xticks(tau_positions)
+    ax.set_xticklabels([f"{tau:g}" for tau in taus])
     ax.set_yticks(gluinoMasses)
-    ax.xaxis.set_major_formatter(ScalarFormatter())
-    ax.xaxis.set_minor_formatter(plt.NullFormatter())
-
+    ax.set_title("FAKE! NOT REAL! Exclusion plot")
+ 
     plt.savefig(output)
     plt.close(fig)
 
