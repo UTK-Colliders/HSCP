@@ -32,6 +32,7 @@ def read_signal_points(csv_path):
 def compute_upper_limits(signal_points, plot=True, do_debug_print=False):
     obs_limits = {}
     exp_limits_median = {}
+    exp_limits_full = {}
 
     os.makedirs("pdfs", exist_ok=True)
 
@@ -53,14 +54,18 @@ def compute_upper_limits(signal_points, plot=True, do_debug_print=False):
 
         obs_limits[(tau, gluinoMass, neutralinoMass, quarkDecay)] = obs_limit
         exp_limits_median[(tau, gluinoMass, neutralinoMass, quarkDecay)] = exp_limits[2]
+        exp_limits_full[(tau, gluinoMass, neutralinoMass, quarkDecay)] = exp_limits
 
-    return obs_limits, exp_limits_median
+    return obs_limits, exp_limits_median, exp_limits_full
 
-def filter_limits(limits_dict, predicate, mass_split_tol=1e-6):
+def filter_limits(limits_dict, predicate, fixed_tau=None, tau_tol=1e-6):
     """
     Reduce a {(tau, gluinoMass, neutralinoMass, quarkDecay): value} dict down to a
-    {(tau, gluinoMass): value} dict, keeping only entries where predicate(gluinoMass,
-    neutralinoMass, quarkDecay) is True.
+    {(tau, gluinoMass): value} dict, keeping only entries where
+    predicate(gluinoMass, neutralinoMass, quarkDecay) is True.
+
+    If fixed_tau is provided, reduce instead to a {gluinoMass: value} dict at that
+    lifetime.
 
     predicate receives floats for gluinoMass/neutralinoMass and a string for
     quarkDecay, so conditions like a fixed neutralino mass, or a fixed mass
@@ -68,18 +73,26 @@ def filter_limits(limits_dict, predicate, mass_split_tol=1e-6):
     """
     filtered = {}
     for (tau, gluinoMass, neutralinoMass, quarkDecay), value in limits_dict.items():
-        if predicate(gluinoMass, neutralinoMass, quarkDecay):
-            key = (tau, gluinoMass)
+        if predicate(gluinoMass, neutralinoMass, quarkDecay) and (
+            fixed_tau is None or np.isclose(tau, fixed_tau, atol=tau_tol)
+        ):
+            key = (tau, gluinoMass) if fixed_tau is None else gluinoMass
             if key in filtered:
+                if fixed_tau is None:
+                    raise ValueError(
+                        f"Duplicate (tau={tau}, gluinoMass={gluinoMass}) after filtering -- "
+                        f"the predicate isn't narrowing down to a single neutralinoMass/quarkDecay "
+                        f"per point, so the 2D grid would be ambiguous."
+                    )
                 raise ValueError(
-                    f"Duplicate (tau={tau}, gluinoMass={gluinoMass}) after filtering — "
+                    f"Duplicate (tau~={fixed_tau}, gluinoMass={gluinoMass}) after filtering -- "
                     f"the predicate isn't narrowing down to a single neutralinoMass/quarkDecay "
-                    f"per point, so the 2D grid would be ambiguous."
+                    f"per point, so the 1D mass scan would be ambiguous."
                 )
             filtered[key] = value
     return filtered
 
-def plot_xsec_limit_vs_mass(mass_to_results, xsecDict, output="xsec_limit_vs_mass.pdf"):
+def plot_xsec_limit_vs_mass(mass_to_results, xsecDict, tau, quarkDecay, massSplitting, output="xsec_limit_vs_mass.pdf"):
     """
     mass_to_results: dict mapping gluino_mass -> (obs_limit_mu, exp_limits_mu array-like of 5 values [-2,-1,0,+1,+2 sigma])
     """
@@ -95,17 +108,29 @@ def plot_xsec_limit_vs_mass(mass_to_results, xsecDict, output="xsec_limit_vs_mas
         xsec, xsec_unc = xsecDict[m]
         theory_xsec.append(xsec)
         theory_xsec_unc.append(xsec_unc)
-
-        obs_xsec.append(obs_mu * xsec)
+        obs_xsec.append(obs_mu)
         for sigma_index, sigma in enumerate(range(-2, 3)):
-            exp_xsec[sigma].append(exp_mu[sigma_index] * xsec)
+            exp_xsec[sigma].append(exp_mu[sigma_index])
 
     masses = np.array(masses)
     theory_xsec = np.array(theory_xsec)
     theory_xsec_unc = np.array(theory_xsec_unc)
 
+    if quarkDecay == "uds":
+        decayString = fr"$\tilde{{g}} \rightarrow \tilde{{\chi}}^0_1 + (u\bar{{u}},d\bar{{d}},s\bar{{s}})$"
+    else:
+        decayString = fr"$\tilde{{g}} \rightarrow \tilde{{\chi}}^0_1 + t\bar{{t}}$"
+    if massSplitting == "small":
+        neutralinoMassString = fr'$m_{{\tilde{{\chi}}^0_1}}=m_{{\tilde{{g}}}}-100$ [GeV]'
+    else:
+        neutralinoMassString = fr'$m_{{\tilde{{\chi}}^0_1}}=100$ [GeV]'
+
     fig, ax = plt.subplots()
     fig.set_size_inches(10.5, 7)
+
+    plt.text(.55, .99, fr"$\tau_{{\tilde{{g}}}}={tau}$ [ns]", ha='left', va='top', transform=ax.transAxes)    
+    plt.text(.55, .94, decayString, ha='left', va='top', transform=ax.transAxes)
+    plt.text(.55, .89, neutralinoMassString, ha='left', va='top', transform=ax.transAxes)
 
     # Expected band (2 sigma, then 1 sigma on top)
     ax.fill_between(masses, exp_xsec[-2], exp_xsec[2], color="#FFD700", label="Expected ± 2σ")
@@ -116,14 +141,16 @@ def plot_xsec_limit_vs_mass(mass_to_results, xsecDict, output="xsec_limit_vs_mas
     ax.plot(masses, obs_xsec, color="black", marker="o", label="Observed limit")
 
     # Theory curve with its own uncertainty band
-    ax.plot(masses, theory_xsec, color="red", linewidth=2, label="Theory (NLO+NLL)")
+    ax.plot(masses, theory_xsec, color="red", linewidth=2, label="Theory")
     ax.fill_between(masses, theory_xsec - theory_xsec_unc, theory_xsec + theory_xsec_unc,
                     color="red", alpha=0.2)
 
     ax.set_yscale("log")
-    ax.set_xlabel("m(gluino) [GeV]")
+    ax.set_xlabel(r"$m_{\tilde{g}}$ [GeV]")
     ax.set_ylabel("95% CL upper limit on σ [fb]")
-    ax.legend(loc="best")
+    ax.set_xticks(masses)
+    ax.set_title("FAKE! NOT REAL! Exclusion plot")
+    ax.legend(loc="upper right")
 
     plt.savefig(output)
 
@@ -201,13 +228,70 @@ def main():
     args = parser.parse_args()
 
     signal_points = read_signal_points(args.csv_input)
-    obs_limits, exp_limits_median = compute_upper_limits(signal_points, args.createIndividualPlots, args.do_debug_print)
+    obs_limits, exp_limits_median, exp_limits_full = compute_upper_limits(
+        signal_points, args.createIndividualPlots, args.do_debug_print
+    )
 
     os.makedirs(args.exclusionPlotOutputDir, exist_ok=True)
 
-    # Each entry: (output filename, plot title, predicate over (gluinoMass, neutralinoMass, quarkDecay))
+    # Create exclusion as a function of mass plot. One for each lifetime and decay
     mass_split = 100.0
     fixed_neutralino_mass = 100.0
+    all_taus = [0.1, 0.3, 1, 3, 10, 30]
+    mass_scan_scenarios = [
+        (
+            "neutralino100_uds",
+            "large",
+            "uds",
+            lambda gm, nm, qd: np.isclose(nm, fixed_neutralino_mass) and qd == "uds",
+        ),
+        (
+            "neutralino100_ttbar",
+            "large",
+            "ttbar",
+            lambda gm, nm, qd: np.isclose(nm, fixed_neutralino_mass) and qd == "ttbar",
+        ),
+        (
+            "massSplit100_uds",
+            "small",
+            "uds",
+            lambda gm, nm, qd: np.isclose(gm - nm, mass_split) and qd == "uds",
+        ),
+    ]
+
+    # Grab the shared theory cross section dictionary from any valid StatFit point.
+    first_point = signal_points[0]
+    xsec_dict = StatFit(
+        first_point["n_signal"],
+        first_point["n_background"],
+        first_point["background_uncertainty"],
+        first_point["gluinoMass"],
+        first_point["neutralinoMass"],
+        first_point["tau"],
+        first_point["quarkDecay"],
+        False,
+    ).xsecDict
+
+    for tau in all_taus:
+        for scenario_label, massSplitting, quarkDecay, predicate in mass_scan_scenarios:
+            filtered_obs = filter_limits(obs_limits, predicate, fixed_tau=tau)
+            filtered_exp_full = filter_limits(exp_limits_full, predicate, fixed_tau=tau)
+
+            masses = sorted(set(filtered_obs.keys()) & set(filtered_exp_full.keys()))
+            if not masses:
+                continue
+
+            mass_to_results = {
+                mass: (filtered_obs[mass], filtered_exp_full[mass]) for mass in masses
+            }
+
+            output_filename = f"exclusion_tau{tau:g}_{scenario_label}.pdf"
+            output_path = os.path.join(args.exclusionPlotOutputDir, output_filename)
+            plot_xsec_limit_vs_mass(mass_to_results, xsec_dict, tau, quarkDecay, massSplitting, output_path)
+            print(f"Wrote {output_path}")
+
+    # Create 2D exclusion as a function of mass and lifetime. One for each decay
+    # Each entry: (output filename, plot title, predicate over (gluinoMass, neutralinoMass, quarkDecay))
     scenarios = [
         (
             "exclusion_neutralino100_uds.pdf",
