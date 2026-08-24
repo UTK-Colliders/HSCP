@@ -11,6 +11,7 @@ from matplotlib.ticker import ScalarFormatter
 from matplotlib.lines import Line2D
 from pyHF_statFit import StatFit
 import mplhep as hep
+from scipy.interpolate import griddata
 
 def read_signal_points(csv_path):
     signal_points = []
@@ -178,6 +179,38 @@ def build_grid(obs_limits, exp_limits_median):
 
     return taus, gluinoMasses, Z_obs, Z_exp
 
+def interpolate_upperlimits(Z_obs, Z_exp, n_points=500):
+    taus = np.array([0.1, 0.3, 1, 3, 10, 30])
+    gluinoMasses = np.array([1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600, 2800])
+
+    log_taus = np.log10(taus)
+    gluinoMasses_fine = np.linspace(gluinoMasses.min(), gluinoMasses.max(), n_points)
+    log_taus_fine = np.linspace(log_taus.min(), log_taus.max(), n_points)
+
+    gluinoMasses_grid, log_taus_grid = np.meshgrid(gluinoMasses, log_taus, indexing="ij")
+    gluinoMasses_fine_grid, log_taus_fine_grid = np.meshgrid(
+        gluinoMasses_fine, log_taus_fine, indexing="ij"
+    )
+    taus_fine_grid = 10 ** log_taus_fine_grid
+
+    # Zero entries in build_grid represent missing scan points, not limits.
+    def interpolate(values):
+        valid = values > 0
+        points = (gluinoMasses_grid[valid], log_taus_grid[valid])
+        log_values = np.log10(values[valid])
+        interpolated_log = griddata(
+            points,
+            log_values,
+            (gluinoMasses_fine_grid, log_taus_fine_grid),
+            method="linear",
+        )
+        return 10 ** interpolated_log
+
+    interpolated_obs_xsecs = interpolate(Z_obs)
+    interpolated_exp_xsecs = interpolate(Z_exp)
+
+    return taus_fine_grid, gluinoMasses_fine_grid, interpolated_obs_xsecs, interpolated_exp_xsecs
+
 def plot_massVstau_exclusion(taus, gluinoMasses, massSplitting, quarkDecay, Z_obs, Z_exp, output):
     fig, ax = plt.subplots()
     fig.set_size_inches(10.5, 7)
@@ -193,24 +226,23 @@ def plot_massVstau_exclusion(taus, gluinoMasses, massSplitting, quarkDecay, Z_ob
     else:
         neutralinoMassString = fr'$m_{{\tilde{{\chi}}^0_1}}=100$ [GeV]'
  
-    plt.text(.01, .89, decayString, ha='left', va='top', transform=ax.transAxes, fontname="TeX Gyre Heros", size=10)
-    plt.text(.01, .84, neutralinoMassString, ha='left', va='top', transform=ax.transAxes, fontname="TeX Gyre Heros", size=10)
+    plt.text(.01, .91, decayString, ha='left', va='top', transform=ax.transAxes, fontname="TeX Gyre Heros", size=10)
+    plt.text(.01, .86, neutralinoMassString, ha='left', va='top', transform=ax.transAxes, fontname="TeX Gyre Heros", size=10)
 
     # Fake results for testing warning
     plt.text(0.01, 0.94, "Fake results for testing", transform=ax.transAxes, fontname="TeX Gyre Heros", size=20, fontweight='bold')
 
-    tau_positions = np.arange(len(taus)) 
     zmin, zmax = 1e-2, 1e3
     norm = LogNorm(vmin=zmin, vmax=zmax)
-    mesh = ax.pcolormesh(tau_positions, gluinoMasses, Z_obs, shading="nearest", norm=norm, cmap="viridis")
+    mesh = ax.pcolormesh(taus, gluinoMasses, Z_obs, shading="nearest", norm=norm, cmap="viridis")
  
     cbar_ticks = np.logspace(np.log10(zmin), np.log10(zmax), num=6)
     cbar = fig.colorbar(mesh, ax=ax, label=r"95% CL upper limit on $\sigma$ [fb]", ticks=cbar_ticks)
     cbar.ax.yaxis.set_major_formatter(ScalarFormatter())
     cbar.ax.yaxis.set_minor_formatter(plt.NullFormatter())
  
-    ax.contour(tau_positions, gluinoMasses, Z_obs, levels=[1.0], colors="black", linewidths=2)
-    ax.contour(tau_positions, gluinoMasses, Z_exp, levels=[1.0], colors="red", linestyles="dashed", linewidths=2)
+    ax.contour(taus, gluinoMasses, Z_obs, levels=[1.0], colors="black", linewidths=2)
+    ax.contour(taus, gluinoMasses, Z_exp, levels=[1.0], colors="red", linestyles="dashed", linewidths=2)
  
     legend_handles = [
         Line2D([0], [0], color="black", linewidth=2, label="Observed 95% CL exclusion"),
@@ -218,10 +250,9 @@ def plot_massVstau_exclusion(taus, gluinoMasses, massSplitting, quarkDecay, Z_ob
     ]
     ax.legend(handles=legend_handles, loc="lower right")
  
-    # Ticks at the evenly-spaced index positions, labeled with the real tau values
-    ax.set_xticks(tau_positions)
-    ax.set_xticklabels([f"{tau:g}" for tau in taus])
-    ax.set_yticks(gluinoMasses)
+    ax.set_xlim(0.1, 30)
+    ax.set_xscale("log")
+    ax.set_yticks([1000,1200,1400,1600,1800,2000,2200,2400,2600,2800])
 
     # CMS specific
     hep.cms.label("Work in progress", loc=0, ax=ax, fontsize=18, fontproperties="TeX Gyre Heros:italic", com=13.6, lumi=283.8)
@@ -328,6 +359,8 @@ def main():
         filtered_exp = filter_limits(exp_limits_median, predicate)
 
         taus, gluinoMasses, Z_obs, Z_exp = build_grid(filtered_obs, filtered_exp)
+        taus, gluinoMasses, Z_obs, Z_exp = interpolate_upperlimits(Z_obs, Z_exp)
+
         output_path = os.path.join(args.exclusionPlotOutputDir, filename)
         plot_massVstau_exclusion(taus, gluinoMasses, massSplitting, quarkDecay, Z_obs, Z_exp, output_path)
         print(f"Wrote {output_path}")
