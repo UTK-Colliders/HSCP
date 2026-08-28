@@ -8,6 +8,64 @@ import numpy as np
 from matplotlib import pyplot as plt
 from pyhf.contrib.viz import brazil
 import mplhep as hep
+from matplotlib.lines import Line2D
+from matplotlib.patches import Rectangle
+from matplotlib.legend_handler import HandlerBase
+
+
+class HandlerBand(HandlerBase):
+    def create_artists(
+        self, legend, orig_handle, xdescent, ydescent,
+        width, height, fontsize, trans
+    ):
+        thin_top, thick, thin_bottom = orig_handle
+
+        y_top = ydescent + 0.80 * height
+        y_mid = ydescent + 0.50 * height
+        y_bottom = ydescent + 0.20 * height
+
+        # Shaded band between the two thin lines
+        band = Rectangle(
+            (xdescent, y_bottom),
+            width,
+            y_top - y_bottom,
+            facecolor=thin_top.get_color(),
+            alpha=thin_top.get_alpha(),
+            edgecolor="none",
+            transform=trans
+        )
+
+        # Top thin line
+        top_line = Line2D(
+            [xdescent, xdescent + width],
+            [y_top, y_top],
+            color=thin_top.get_color(),
+            linewidth=thin_top.get_linewidth(),
+            linestyle=thin_top.get_linestyle(),
+            transform=trans
+        )
+
+        # Center thick line
+        middle_line = Line2D(
+            [xdescent, xdescent + width],
+            [y_mid, y_mid],
+            color=thick.get_color(),
+            linewidth=thick.get_linewidth(),
+            linestyle=thick.get_linestyle(),
+            transform=trans
+        )
+
+        # Bottom thin line
+        bottom_line = Line2D(
+            [xdescent, xdescent + width],
+            [y_bottom, y_bottom],
+            color=thin_bottom.get_color(),
+            linewidth=thin_bottom.get_linewidth(),
+            linestyle=thin_bottom.get_linestyle(),
+            transform=trans
+        )
+
+        return [band, top_line, middle_line, bottom_line]
 
 class StatFit:
     def __init__(self, n_signal, n_background, background_uncertainty, gluino_mass=1000, neutralino_mass=100, tau=0.1, quark_decay="uds", do_debug_print=False):
@@ -97,7 +155,7 @@ class StatFit:
 
         return x_sec_scan, results, obs_xsec_limit, exp_xsec_limits
 
-    def plot_limits(self, x_sec_scan, results, output):
+    def plot_limits(self, x_sec_scan, results, output, gluino_mass):
         fig, ax = plt.subplots()
         fig.set_size_inches(10.5, 7)
 
@@ -106,20 +164,48 @@ class StatFit:
             decayString = fr"$\tilde{{g}} \rightarrow \tilde{{\chi}}^0_1 + (u\bar{{u}},d\bar{{d}},s\bar{{s}})$"
         else:
             decayString = fr"$\tilde{{g}} \rightarrow \tilde{{\chi}}^0_1 + t\bar{{t}}$"
-        plt.text(.65, .99, fr'$m_{{\tilde{{g}}}}={self.gluino_mass}$ [GeV]', ha='left', va='top', transform=ax.transAxes, fontname="TeX Gyre Heros", size=10)
-        plt.text(.65, .94, fr'$\tau_{{\tilde{{g}}}}={self.tau}$ [ns]', ha='left', va='top', transform=ax.transAxes, fontname="TeX Gyre Heros", size=10)
-        plt.text(.65, .89, decayString, ha='left', va='top', transform=ax.transAxes, fontname="TeX Gyre Heros", size=10)
-        plt.text(.65, .84, fr'$m_{{\tilde{{\chi}}^0_1}}={self.neutralino_mass}$ [GeV]', ha='left', va='top', transform=ax.transAxes, fontname="TeX Gyre Heros", size=10)
+        plt.text(.55, .99, fr'$m_{{\tilde{{g}}}}={self.gluino_mass}$ [GeV]', ha='left', va='top', transform=ax.transAxes, fontname="TeX Gyre Heros", size=10)
+        plt.text(.55, .94, fr'$\tau_{{\tilde{{g}}}}={self.tau}$ [ns]', ha='left', va='top', transform=ax.transAxes, fontname="TeX Gyre Heros", size=10)
+        plt.text(.55, .89, decayString, ha='left', va='top', transform=ax.transAxes, fontname="TeX Gyre Heros", size=10)
+        plt.text(.55, .84, fr'$m_{{\tilde{{\chi}}^0_1}}={self.neutralino_mass}$ [GeV]', ha='left', va='top', transform=ax.transAxes, fontname="TeX Gyre Heros", size=10)
 
         # Fake results for testing warning
         plt.text(0.01, 0.94, "Fake results for testing", transform=ax.transAxes, fontname="TeX Gyre Heros", size=20, fontweight='bold')
 
         artists = brazil.plot_results(x_sec_scan, results, ax=ax)
+        first_legend = ax.get_legend()
         ax.set_xlabel(r"$\sigma$ [fb]")
-        ax.legend(loc="best")
+        #ax.legend(loc="best")
 
         # CMS specific
         hep.cms.label("Work in progress", loc=0, ax=ax, fontsize=18, fontproperties="TeX Gyre Heros:italic", com=13.6, lumi=283.8)
+
+        # Plot a vertical band for the theory xsec
+        theory_xsec = self.xsecDict[gluino_mass][0]
+        theory_xsec_error = self.xsecDict[gluino_mass][1]
+        plt.axvline(x=theory_xsec, color='indianred')
+        plt.axvspan(theory_xsec - theory_xsec_error, theory_xsec + theory_xsec_error, color='lightcoral', alpha=0.3)
+
+        exp_thin_a = Line2D([0], [0], color="lightcoral", linewidth=2, alpha=0.3)
+        exp_thick = Line2D([0], [0], color="indianred", linewidth=2)
+        exp_thin_b = Line2D([0], [0], color="lightcoral", linewidth=2, alpha=0.3)
+
+        legend_handles = [
+            (exp_thin_a, exp_thick, exp_thin_b),
+        ]
+
+        legend_labels = [
+            r"$\sigma_{theory} \pm$ uncertainty",
+        ]
+
+        handles = first_legend.legend_handles if first_legend is not None else []
+        labels = [text.get_text() for text in first_legend.get_texts()] if first_legend is not None else []
+        ax.legend(
+            handles + legend_handles,
+            labels + legend_labels,
+            handler_map={tuple: HandlerBand()},
+            loc="upper right"
+        )
 
         plt.savefig(output)
 
@@ -140,7 +226,7 @@ class StatFit:
 
 def main():
     parser = argparse.ArgumentParser(description="Perform a single-channel statistical fit with uncorrelated background")
-    parser.add_argument("--n_signal", type=float, default=1.0, help="Number of signal events expected in the signal region")
+    parser.add_argument("--n_signal", type=float, default=10.0, help="Number of signal events expected in the signal region")
     parser.add_argument("--n_background", type=float, default=1.0, help="Number of background events expected in the signal region")
     parser.add_argument("--background_uncertainty", type=float, default=1.0, help="Uncertainty on number of background events expected in the signal region. For example, if the number of background events is 50 +- 5, you would pass 5 into this argument.")
     parser.add_argument("--n_observed", type=int, default=1, help="Number of events observed in data in the signal region")
@@ -177,7 +263,7 @@ def main():
 
     # Set upper limits (mu, and xsec if gluino_mass was given) and plot them
     poi_values, results, obs_limit, exp_limits = stat_fit.set_limits(observations)
-    stat_fit.plot_limits(poi_values, results, args.limitPlotOutput)
+    stat_fit.plot_limits(poi_values, results, args.limitPlotOutput, args.gluino_mass)
 
 if __name__ == "__main__":
     main()
