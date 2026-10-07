@@ -8,25 +8,7 @@ tau = "100ps"
 neutralino_mass = 100
 decay = "uds"
 
-process.RAWSIMoutput = cms.OutputModule("PoolOutputModule",
-    SelectEvents = cms.untracked.PSet(
-        SelectEvents = cms.vstring('generation_step')
-    ),
-    compressionAlgorithm = cms.untracked.string('LZMA'),
-    compressionLevel = cms.untracked.int32(1),
-    dataset = cms.untracked.PSet(
-        dataTier = cms.untracked.string('GEN-SIM'),
-        filterName = cms.untracked.string('')
-    ),
-    eventAutoFlushCompressedSize = cms.untracked.int32(20971520),
-    fileName = cms.untracked.string(outputFile),
-    outputCommands = process.RAWSIMEventContent.outputCommands + [
-        'keep recoGenParticles_*'
-    ],
-    splitLevel = cms.untracked.int32(0)
-)
-
-process.dirhadrongenfilter = cms.EDFilter("MCParticlePairFilter",
+dirhadrongenfilter = cms.EDFilter("MCParticlePairFilter",
     MaxEta = cms.untracked.vdouble(100.0, 100.0),
     MinEta = cms.untracked.vdouble(-100, -100),
     MinP = cms.untracked.vdouble(0.0, 0.0),
@@ -47,7 +29,7 @@ process.dirhadrongenfilter = cms.EDFilter("MCParticlePairFilter",
     Status = cms.untracked.vint32(1, 1)
 )
 
-process.generator = cms.EDFilter("Pythia8ConcurrentHadronizerFilter",
+generator = cms.EDFilter("Pythia8ConcurrentHadronizerFilter",
     PythiaParameters = cms.PSet(
         parameterSets = cms.vstring(
             'pythia8CommonSettings', 
@@ -119,6 +101,5 @@ process.generator = cms.EDFilter("Pythia8ConcurrentHadronizerFilter",
 )
 
 
-process.ProductionFilterSequence = cms.Sequence(process.externalLHEProducer * process.generator * process.dirhadrongenfilter)
+ProductionFilterSequence = cms.Sequence(generator * dirhadrongenfilter)
 from SimG4Core.CustomPhysics.Exotica_HSCP_SIM_cfi import customise 
-process = customise(process)
