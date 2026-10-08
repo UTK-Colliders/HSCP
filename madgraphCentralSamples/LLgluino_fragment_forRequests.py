@@ -88,7 +88,7 @@ generator = cms.EDFilter("Pythia8ConcurrentHadronizerFilter",
             '1000021:mayDecay = off'
         )
     ),
-    SLHAFileForPythia8 = cms.string(f'Configuration/Generator/data/SUSY/LLGluino/LLGluino_M-{gluino_mass}_tau-{tau}_{decay}QuarkDecay_chi10_M-{neutralino_mass}.slha'),
+    SLHAFileForPythia8 = cms.string(f'Configuration/Generator/data/SUSY/LLGluino/LLgluino_M-{gluino_mass}_tau-{tau}_{decay}QuarkDecay_chi10_M-{neutralino_mass}.slha'),
     comEnergy = cms.double(13600.0),
     crossSection = cms.untracked.double(-1),
     hscpFlavor = cms.untracked.string('gluino'),
